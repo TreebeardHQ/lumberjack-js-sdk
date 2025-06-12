@@ -1,13 +1,19 @@
 export interface LogLevel {
-  TRACE: 'trace';
-  DEBUG: 'debug';
-  INFO: 'info';
-  WARN: 'warn';
-  ERROR: 'error';
-  FATAL: 'fatal';
+  TRACE: "trace";
+  DEBUG: "debug";
+  INFO: "info";
+  WARN: "warn";
+  ERROR: "error";
+  FATAL: "fatal";
 }
 
-export type LogLevelType = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+export type LogLevelType =
+  | "trace"
+  | "debug"
+  | "info"
+  | "warn"
+  | "error"
+  | "fatal";
 
 export interface LogEntry {
   message: string;
@@ -27,6 +33,21 @@ export interface LogEntry {
   [key: string]: any;
 }
 
+export interface LogEntryForAPI {
+  msg: string;
+  lvl: string;
+  ts: number;
+  fl?: string | undefined;
+  ln?: number | undefined;
+  tb?: string | undefined;
+  src?: string | undefined;
+  props?: Record<string, any> | undefined;
+  tid?: string | undefined;
+  exv?: string | undefined;
+  ext?: string | undefined;
+  fn?: string | undefined;
+}
+
 export interface TreebeardConfig {
   apiKey?: string;
   endpoint?: string;
@@ -36,6 +57,7 @@ export interface TreebeardConfig {
   flushInterval?: number;
   captureConsole?: boolean;
   captureUnhandled?: boolean;
+  debug?: boolean;
 }
 
 export interface TraceContext {

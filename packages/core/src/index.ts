@@ -1,36 +1,28 @@
-export { TreebeardCore } from './core.js';
-export { TreebeardContext } from './context.js';
-export type { 
-  TreebeardConfig, 
-  LogEntry, 
-  LogLevelType, 
-  TraceContext 
-} from './types.js';
+export { TreebeardContext } from "./context.js";
+export { TreebeardCore } from "./core.js";
 
-import { TreebeardCore } from './core.js';
+export { detectRuntime, getEnvironmentValue } from "./runtime.js";
+export type { RuntimeEnvironment } from "./runtime.js";
+export type {
+  LogEntry,
+  LogLevelType,
+  TraceContext,
+  TreebeardConfig,
+} from "./types.js";
 
-export function init(config?: import('./types.js').TreebeardConfig): TreebeardCore {
-  return TreebeardCore.init(config);
-}
+import { TreebeardCore } from "./core.js";
 
 export const log = {
-  trace: (message: string, metadata?: Record<string, any>) => 
+  trace: (message: string, metadata?: Record<string, any>) =>
     TreebeardCore.getInstance()?.trace(message, metadata),
-  debug: (message: string, metadata?: Record<string, any>) => 
+  debug: (message: string, metadata?: Record<string, any>) =>
     TreebeardCore.getInstance()?.debug(message, metadata),
-  info: (message: string, metadata?: Record<string, any>) => 
+  info: (message: string, metadata?: Record<string, any>) =>
     TreebeardCore.getInstance()?.info(message, metadata),
-  warn: (message: string, metadata?: Record<string, any>) => 
+  warn: (message: string, metadata?: Record<string, any>) =>
     TreebeardCore.getInstance()?.warn(message, metadata),
-  error: (message: string, metadata?: Record<string, any>) => 
+  error: (message: string, metadata?: Record<string, any>) =>
     TreebeardCore.getInstance()?.error(message, metadata),
-  fatal: (message: string, metadata?: Record<string, any>) => 
-    TreebeardCore.getInstance()?.fatal(message, metadata)
-};
-
-export const trace = {
-  start: (name: string, metadata?: Record<string, any>) => 
-    TreebeardCore.getInstance()?.startTrace(name, metadata),
-  end: (success?: boolean, metadata?: Record<string, any>) => 
-    TreebeardCore.getInstance()?.endTrace(success, metadata)
+  fatal: (message: string, metadata?: Record<string, any>) =>
+    TreebeardCore.getInstance()?.fatal(message, metadata),
 };

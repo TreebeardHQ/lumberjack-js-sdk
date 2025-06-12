@@ -1,5 +1,6 @@
-import { AsyncLocalStorage } from 'async_hooks';
-import { TraceContext } from './types.js';
+import { AsyncLocalStorage } from "async_hooks";
+import { randomBytes } from "node:crypto";
+import { TraceContext } from "./types.js";
 
 class TreebeardContext {
   private static asyncLocalStorage = new AsyncLocalStorage<TraceContext>();
@@ -8,7 +9,10 @@ class TreebeardContext {
     return this.asyncLocalStorage.run(store, callback);
   }
 
-  static runAsync<T>(store: TraceContext, callback: () => Promise<T>): Promise<T> {
+  static runAsync<T>(
+    store: TraceContext,
+    callback: () => Promise<T>
+  ): Promise<T> {
     return this.asyncLocalStorage.run(store, callback);
   }
 
@@ -29,33 +33,33 @@ class TreebeardContext {
   }
 
   static getTraceId(): string | undefined {
-    return this.get('traceId');
+    return this.get("traceId");
   }
 
   static getSpanId(): string | undefined {
-    return this.get('spanId');
+    return this.get("spanId");
   }
 
   static setTraceId(traceId: string): void {
-    this.set('traceId', traceId);
+    this.set("traceId", traceId);
   }
 
   static setSpanId(spanId: string): void {
-    this.set('spanId', spanId);
+    this.set("spanId", spanId);
   }
 
   static generateTraceId(): string {
-    return `T${Date.now()}${Math.random().toString(36).substr(2, 9)}`;
+    return `${randomBytes(16).toString("hex")}`; // 32-char, lower-case}`;
   }
 
   static generateSpanId(): string {
-    return `S${Date.now()}${Math.random().toString(36).substr(2, 9)}`;
+    return `${randomBytes(8).toString("hex")}`;
   }
 
   static clear(): void {
     const store = this.getStore();
     if (store) {
-      Object.keys(store).forEach(key => delete store[key]);
+      Object.keys(store).forEach((key) => delete store[key]);
     }
   }
 }

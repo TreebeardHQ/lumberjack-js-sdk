@@ -1,5 +1,5 @@
 import { Application, Request, Response, NextFunction, ErrorRequestHandler } from 'express';
-import { TreebeardCore, TreebeardContext } from '@treebeard/core';
+import { TreebeardCore, TreebeardContext } from '@treebeardhq/core';
 import { 
   ExpressInstrumentationConfig, 
   InstrumentedRequest, 

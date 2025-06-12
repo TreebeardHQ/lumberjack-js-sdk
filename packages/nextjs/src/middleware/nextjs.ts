@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { TreebeardCore, TreebeardContext } from '@treebeard/core';
+import { TreebeardCore } from "@treebeardhq/core";
+import { NextRequest, NextResponse } from "next/server";
 
 export interface NextJSMiddlewareConfig {
   ignorePaths?: string[];
@@ -10,16 +10,16 @@ export interface NextJSMiddlewareConfig {
 
 export function createTreebeardMiddleware(config: NextJSMiddlewareConfig = {}) {
   const {
-    ignorePaths = ['/api/health', '/_next', '/favicon.ico'],
+    ignorePaths = ["/api/health", "/_next", "/favicon.ico"],
     captureHeaders = true,
     captureBody = false,
-    sanitizeHeaders = ['authorization', 'cookie', 'x-api-key']
+    sanitizeHeaders = ["authorization", "cookie", "x-api-key"],
   } = config;
 
   return async function middleware(request: NextRequest) {
     const pathname = request.nextUrl.pathname;
 
-    if (ignorePaths.some(path => pathname.startsWith(path))) {
+    if (ignorePaths.some((path) => pathname.startsWith(path))) {
       return NextResponse.next();
     }
 
@@ -28,97 +28,103 @@ export function createTreebeardMiddleware(config: NextJSMiddlewareConfig = {}) {
       return NextResponse.next();
     }
 
-    const traceId = TreebeardContext.generateTraceId();
-    const spanId = TreebeardContext.generateSpanId();
+    // Generate trace and span IDs
+    const traceId = generateTraceId();
+    const spanId = generateSpanId();
     const traceName = `${request.method} ${pathname}`;
+    const startTime = Date.now();
 
-    const context = {
-      traceId,
-      spanId,
-      traceName,
-      requestId: request.headers.get('x-request-id') || `req_${Date.now()}`
+    // Set trace context in global for console capture
+    if (typeof globalThis !== "undefined") {
+      (globalThis as any).__TREEBEARD_TRACE_CONTEXT = { traceId, spanId };
+    }
+
+    const requestData: Record<string, any> = {
+      method: request.method,
+      url: request.url,
+      pathname,
+      query: Object.fromEntries(request.nextUrl.searchParams.entries()),
+      userAgent: request.headers.get("user-agent"),
+      ip:
+        request.ip ||
+        request.headers.get("x-forwarded-for") ||
+        request.headers.get("x-real-ip"),
+      requestId: request.headers.get("x-request-id") || `req_${Date.now()}`,
     };
 
-    return await TreebeardContext.runAsync(context, async () => {
-      const startTime = Date.now();
-
-      const requestData: Record<string, any> = {
-        method: request.method,
-        url: request.url,
-        pathname,
-        query: Object.fromEntries(request.nextUrl.searchParams.entries()),
-        userAgent: request.headers.get('user-agent'),
-        ip: request.ip || request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip')
-      };
-
-      if (captureHeaders) {
-        const headers: Record<string, string> = {};
-        request.headers.forEach((value, key) => {
-          if (sanitizeHeaders.includes(key.toLowerCase())) {
-            headers[key] = '[REDACTED]';
-          } else {
-            headers[key] = value;
-          }
-        });
-        requestData.headers = headers;
-      }
-
-      if (captureBody && ['POST', 'PUT', 'PATCH'].includes(request.method)) {
-        try {
-          requestData.body = await request.json();
-        } catch {
-          // Body might not be JSON or already consumed
+    if (captureHeaders) {
+      const headers: Record<string, string> = {};
+      request.headers.forEach((value, key) => {
+        if (sanitizeHeaders.includes(key.toLowerCase())) {
+          headers[key] = "[REDACTED]";
+        } else {
+          headers[key] = value;
         }
-      }
-
-      treebeard.info(`Starting request: ${traceName}`, {
-        ...requestData,
-        _traceStart: true
       });
+      requestData.headers = headers;
+    }
 
-      let response: NextResponse;
-      let error: Error | null = null;
-
+    if (captureBody && ["POST", "PUT", "PATCH"].includes(request.method)) {
       try {
-        response = NextResponse.next();
-      } catch (err) {
-        error = err instanceof Error ? err : new Error(String(err));
-        response = NextResponse.json(
-          { error: 'Internal Server Error' },
-          { status: 500 }
-        );
+        const clonedRequest = request.clone();
+        requestData.body = await clonedRequest.json();
+      } catch {
+        // Body might not be JSON or already consumed
       }
+    }
+
+    // Start trace
+    treebeard.log("info", `Starting request: ${traceName}`, {
+      ...requestData,
+      traceId,
+      spanId,
+      _traceStart: true,
+    });
+
+    let response: NextResponse;
+    let error: Error | null = null;
+
+    try {
+      response = NextResponse.next();
+
+      // Add trace headers to response
+      response.headers.set("x-treebeard-trace-id", traceId);
+      response.headers.set("x-treebeard-span-id", spanId);
+      response.headers.set("x-treebeard-trace-name", traceName);
+    } catch (err) {
+      error = err instanceof Error ? err : new Error(String(err));
+      response = NextResponse.json(
+        { error: "Internal Server Error" },
+        { status: 500 }
+      );
 
       const duration = Date.now() - startTime;
-      const responseData = {
-        statusCode: response.status,
+      treebeard.logError(`Failed request: ${traceName}`, error, {
+        statusCode: 500,
         duration,
-        headers: captureHeaders ? Object.fromEntries(response.headers.entries()) : undefined
-      };
+        traceId,
+        spanId,
+        _traceEnd: true,
+        success: false,
+      });
 
-      if (error) {
-        treebeard.logError(`Failed request: ${traceName}`, error, {
-          ...responseData,
-          _traceEnd: true,
-          success: false
-        });
-      } else if (response.status >= 400) {
-        treebeard.error(`Request completed with error: ${traceName}`, {
-          ...responseData,
-          _traceEnd: true,
-          success: false
-        });
-      } else {
-        treebeard.info(`Completed request: ${traceName}`, {
-          ...responseData,
-          _traceEnd: true,
-          success: true
-        });
+      // Clear global trace context
+      if (typeof globalThis !== "undefined") {
+        delete (globalThis as any).__TREEBEARD_TRACE_CONTEXT;
       }
+    }
 
-      return response;
-    });
+    return response;
   };
+}
+
+// Helper functions for trace ID generation
+function generateTraceId(): string {
+  return `T${Date.now()}${Math.random().toString(36).substr(2, 9)}`;
+}
+
+function generateSpanId(): string {
+  return `S${Date.now()}${Math.random().toString(36).substr(2, 9)}`;
 }
 
 export function withTreebeard<T extends (...args: any[]) => any>(
@@ -131,44 +137,57 @@ export function withTreebeard<T extends (...args: any[]) => any>(
       return handler(...args);
     }
 
-    const name = traceName || handler.name || 'handler';
-    const traceId = TreebeardContext.generateTraceId();
-    const spanId = TreebeardContext.generateSpanId();
+    const name = traceName || handler.name || "handler";
 
-    const context = {
+    // Try to get existing trace context or create new one
+    let traceId: string;
+    let spanId: string;
+
+    if (
+      typeof globalThis !== "undefined" &&
+      (globalThis as any).__TREEBEARD_TRACE_CONTEXT
+    ) {
+      traceId = (globalThis as any).__TREEBEARD_TRACE_CONTEXT.traceId;
+      spanId = generateSpanId(); // New span for this handler
+    } else {
+      traceId = generateTraceId();
+      spanId = generateSpanId();
+    }
+
+    const startTime = Date.now();
+
+    treebeard.log("info", `Starting ${name}`, {
       traceId,
       spanId,
-      traceName: name
-    };
-
-    return await TreebeardContext.runAsync(context, async () => {
-      const startTime = Date.now();
-      
-      treebeard.info(`Starting ${name}`, { _traceStart: true });
-
-      try {
-        const result = await handler(...args);
-        const duration = Date.now() - startTime;
-        
-        treebeard.info(`Completed ${name}`, {
-          duration,
-          _traceEnd: true,
-          success: true
-        });
-        
-        return result;
-      } catch (error) {
-        const duration = Date.now() - startTime;
-        const err = error instanceof Error ? error : new Error(String(error));
-        
-        treebeard.logError(`Failed ${name}`, err, {
-          duration,
-          _traceEnd: true,
-          success: false
-        });
-        
-        throw error;
-      }
+      _traceStart: true,
     });
+
+    try {
+      const result = await handler(...args);
+      const duration = Date.now() - startTime;
+
+      treebeard.log("info", `Completed ${name}`, {
+        traceId,
+        spanId,
+        duration,
+        _traceEnd: true,
+        success: true,
+      });
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const err = error instanceof Error ? error : new Error(String(error));
+
+      treebeard.logError(`Failed ${name}`, err, {
+        traceId,
+        spanId,
+        duration,
+        _traceEnd: true,
+        success: false,
+      });
+
+      throw error;
+    }
   }) as T;
 }
