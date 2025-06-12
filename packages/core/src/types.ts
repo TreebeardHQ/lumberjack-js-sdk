@@ -30,7 +30,7 @@ export interface LogEntry {
     message: string;
     stack: string;
   };
-  [key: string]: any;
+  props?: Record<string, any>;
 }
 
 export interface LogEntryForAPI {

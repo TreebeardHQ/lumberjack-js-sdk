@@ -218,11 +218,12 @@ export class TreebeardCore extends EventEmitter {
     if (this.isShuttingDown) return;
 
     const context = TreebeardContext.getStore();
-    const caller = getCallerInfo(1);
+    const caller = getCallerInfo(2);
 
     const logEntry: LogEntry = {
       message,
       level,
+
       timestamp: Date.now(),
       traceId: metadata.traceId || context?.traceId,
       ...((metadata.spanId || context?.spanId) && {
@@ -230,7 +231,10 @@ export class TreebeardCore extends EventEmitter {
       }),
       source: metadata.source || "treebeard-js",
       ...caller,
-      ...metadata,
+      props: {
+        ...metadata,
+        tn: metadata.traceName || context?.traceName,
+      },
     };
 
     if (this.config.debug) {
@@ -359,12 +363,12 @@ export class TreebeardCore extends EventEmitter {
           ts: log.timestamp,
           fl: log.file,
           ln: log.line,
-          tb: log.stack,
+          tb: log.exception?.stack,
           src: log.source,
           props: log.props,
           tid: log.traceId,
           exv: log.exception?.message,
-          ext: log.exception?.stack,
+          ext: log.exception?.name,
           fn: log.function,
         })),
         project_name: this.config.projectName,
