@@ -1,6 +1,6 @@
 {
   "name": "@treebeardhq/nextjs",
-  "version": "0.3.0-alpha.6",
+  "version": "0.3.0-alpha.10",
   "description": "Next.js integration for Treebeard logging and tracing",
   "type": "module",
   "main": "dist/index.js",
@@ -9,10 +9,8 @@
     "access": "public"
   },
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
   },
   "scripts": {
     "build": "tsc",

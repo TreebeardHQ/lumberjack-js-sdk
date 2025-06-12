@@ -71,12 +71,12 @@ export function register(options: InstrumentationOptions = {}) {
     // @ts-ignore
     http.Server.prototype.emit = function (event: string, ...args: any[]) {
       if (event === "request") {
-        const [, res] = args;
+        const [req, res] = args;
         const traceId = TreebeardContext.generateTraceId();
         const spanId = TreebeardContext.generateSpanId();
-        const url = res.url;
+        const path = new URL(req.url).pathname;
         if (options.debug) {
-          console.log("[Treebeard] Request started", { traceId, spanId, url });
+          console.log("[Treebeard] Request started", { traceId, spanId, path });
         }
 
         res.on("finish", () => {
@@ -100,6 +100,7 @@ export function register(options: InstrumentationOptions = {}) {
           {
             traceId,
             spanId,
+            traceName: `${req.method} ${normalizePath(path)}`,
           },
           () => {
             return originalEmit.apply(this, arguments as any);
@@ -123,4 +124,50 @@ export function register(options: InstrumentationOptions = {}) {
   return {
     treebeard,
   };
+}
+
+function normalizePath(path: string): string {
+  // Remove trailing slashes
+  let normalized = path.replace(/\/+$/, "");
+
+  // Remove query parameters and hash fragments
+  normalized = normalized.split("?")[0].split("#")[0];
+
+  // Replace multiple consecutive slashes with a single slash
+  normalized = normalized.replace(/\/+/g, "/");
+
+  // Ensure path starts with a slash
+  if (!normalized.startsWith("/")) {
+    normalized = "/" + normalized;
+  }
+
+  // Handle empty path case
+  if (normalized === "") {
+    normalized = "/";
+  }
+
+  // Split path into segments
+  const segments = normalized.split("/").filter(Boolean);
+
+  // Process segments to replace IDs with named parameters
+  const processedSegments = segments.map((segment, index) => {
+    // Check if segment is a UUID (8-4-4-4-12 format)
+    const isUUID =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        segment
+      );
+    // Check if segment is a number
+    const isNumber = /^\d+$/.test(segment);
+
+    if (isUUID || isNumber) {
+      // Get the preceding segment name or use 'id' if it's the first segment
+      const paramName =
+        index > 0 ? segments[index - 1].replace(/s$/, "") : "id";
+      return `:${paramName}`;
+    }
+    return segment;
+  });
+
+  // Reconstruct the path
+  return "/" + processedSegments.join("/");
 }
