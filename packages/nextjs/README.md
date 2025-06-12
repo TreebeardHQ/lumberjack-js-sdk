@@ -10,7 +10,52 @@ npm install @treebeardhq/core @treebeardhq/nextjs
 
 ## Quick Start
 
-### 1. Create Instrumentation File
+### 1. Setup Configuration
+
+Create or update your `next.config.js` (or `next.config.ts`) file to wrap it with Treebeard:
+
+```javascript
+// next.config.js
+import { withTreebeardConfig } from '@treebeardhq/nextjs';
+
+const nextConfig = {
+  // Your existing Next.js config
+};
+
+export default withTreebeardConfig(nextConfig, {
+  // Treebeard config options (all optional)
+  uploadSourceMaps: true, // Enable sourcemap uploading (default: true)
+  debug: process.env.NODE_ENV === 'development', // Enable debug logging
+  // serviceToken will be read from TREEBEARD_SERVICE_TOKEN env var
+});
+```
+
+**TypeScript version (`next.config.ts`):**
+```typescript
+import { withTreebeardConfig } from '@treebeardhq/nextjs';
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
+  // Your existing Next.js config
+};
+
+export default withTreebeardConfig(nextConfig, {
+  uploadSourceMaps: true,
+  debug: process.env.NODE_ENV === 'development',
+});
+```
+
+### 2. Set Environment Variables
+
+Add your service token to your environment variables:
+
+```bash
+TREEBEARD_SERVICE_TOKEN=your-service-token-here
+```
+
+Get your service token from: https://app.treebeardhq.com/service-token
+
+### 3. Create Instrumentation File
 
 Create `instrumentation.ts` in your Next.js project root:
 
@@ -27,7 +72,7 @@ export function register() {
 }
 ```
 
-### 2. Create Middleware
+### 4. Create Middleware
 
 Create `middleware.ts` in your Next.js project root:
 
@@ -46,7 +91,7 @@ export const config = {
 };
 ```
 
-### 3. Use in API Routes
+### 5. Use in API Routes
 
 ```typescript
 import { withTreebeard } from '@treebeardhq/nextjs';
@@ -68,7 +113,7 @@ export const GET = withTreebeard(handler, 'api-users');
 export const POST = withTreebeard(handler, 'api-users-create');
 ```
 
-### 4. Use in Server Components
+### 6. Use in Server Components
 
 ```typescript
 import { log } from '@treebeardhq/core';
@@ -103,6 +148,54 @@ The Next.js integration uses a **header-based approach** instead of AsyncLocalSt
 4. **Graceful Shutdown**: SIGTERM handlers flush logs before exit (Node.js runtime only)
 
 ## API Reference
+
+### Config Wrapper
+
+```typescript
+withTreebeardConfig(nextConfig?: NextConfig, options?: TreebeardConfigOptions): NextConfig
+```
+
+Wraps your Next.js configuration to add Treebeard functionality, including automatic sourcemap uploading.
+
+#### Configuration Options
+
+```typescript
+interface TreebeardConfigOptions {
+  serviceToken?: string;         // Service token for uploads (read from TREEBEARD_SERVICE_TOKEN if not provided)
+  uploadSourceMaps?: boolean;    // Enable sourcemap uploading (default: true)
+  uploadUrl?: string;            // Custom upload endpoint (default: 'https://api.treebeard.com/sourcemaps')
+  project?: string;              // Project identifier (read from package.json if not provided)
+  commit?: string;               // Git commit SHA (auto-detected if not provided)
+  debug?: boolean;               // Enable debug logging (default: false)
+  commitEnvVar?: string;         // Environment variable name for commit SHA (default: 'TREEBEARD_COMMIT_SHA')
+}
+```
+
+#### Features
+
+- **Automatic Sourcemap Upload**: Uploads sourcemaps to Treebeard during production builds
+- **Git Integration**: Automatically detects the current commit SHA and injects it as an environment variable
+- **Service Token Validation**: Warns if the service token is missing with helpful instructions
+- **Debug Mode**: Detailed logging of the upload process when enabled
+
+#### Example
+
+```typescript
+import { withTreebeardConfig } from '@treebeardhq/nextjs';
+
+const nextConfig = {
+  experimental: {
+    appDir: true
+  }
+};
+
+export default withTreebeardConfig(nextConfig, {
+  uploadSourceMaps: true,
+  debug: process.env.NODE_ENV === 'development',
+  project: 'my-app',
+  commitEnvVar: 'GIT_COMMIT_SHA' // Custom env var name
+});
+```
 
 ### Instrumentation Registration
 
@@ -176,6 +269,8 @@ await processOrder('order-123');
 - ✅ **Graceful shutdown** - SIGTERM handlers ensure logs are flushed
 - ✅ **Error handling** - Automatic error capture and logging
 - ✅ **Performance tracking** - Request duration and status code logging
+- ✅ **Sourcemap uploading** - Automatic sourcemap upload during production builds
+- ✅ **Git integration** - Automatic commit SHA detection and environment injection
 
 ## Examples
 
@@ -344,21 +439,30 @@ export const updateOrderStatusAction = withTreebeard(updateOrderStatus, 'update-
 Configure the SDK using environment variables:
 
 ```bash
+# Required for logging
 TREEBEARD_API_KEY=your-api-key
 TREEBEARD_ENDPOINT=https://api.treebeardhq.com/logs/batch
+
+# Required for sourcemap uploading
+TREEBEARD_SERVICE_TOKEN=your-service-token
+
+# Optional
 NODE_ENV=development  # Enables debug mode when set to 'development'
+TREEBEARD_COMMIT_SHA=abc123  # Automatically set by withTreebeardConfig
 ```
 
 ## Best Practices
 
-1. **Use instrumentation.ts** - Always initialize the SDK in `instrumentation.ts` for proper singleton behavior
-2. **Filter paths** - Use `ignorePaths` to avoid tracing static assets and health checks
-3. **Sanitize headers** - Always sanitize sensitive headers in production
-4. **Console capture** - Enable console capture to automatically trace all console.log calls
-5. **Debug mode** - Enable debug logging in development to understand SDK behavior
-6. **Wrap functions** - Use `withTreebeard` for important business logic
-7. **Structured logging** - Include relevant context in your log messages
-8. **Error handling** - Let the SDK automatically capture unhandled errors
+1. **Use withTreebeardConfig** - Wrap your Next.js config to enable sourcemap uploading and git integration
+2. **Use instrumentation.ts** - Always initialize the SDK in `instrumentation.ts` for proper singleton behavior
+3. **Set service token** - Add `TREEBEARD_SERVICE_TOKEN` to your environment for sourcemap uploads
+4. **Filter paths** - Use `ignorePaths` to avoid tracing static assets and health checks
+5. **Sanitize headers** - Always sanitize sensitive headers in production
+6. **Console capture** - Enable console capture to automatically trace all console.log calls
+7. **Debug mode** - Enable debug logging in development to understand SDK behavior
+8. **Wrap functions** - Use `withTreebeard` for important business logic
+9. **Structured logging** - Include relevant context in your log messages
+10. **Error handling** - Let the SDK automatically capture unhandled errors
 
 ## Troubleshooting
 
