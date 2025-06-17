@@ -74,9 +74,18 @@ export function register(options: InstrumentationOptions = {}) {
         const [req, res] = args;
         const traceId = TreebeardContext.generateTraceId();
         const spanId = TreebeardContext.generateSpanId();
-        const path = new URL(req.url).pathname;
+        const fullTrace = `00-${traceId}-${spanId}-01`;
+
+        res.setHeader("X-Treebeard-Trace", fullTrace);
+
+        const path = req.url;
+
         if (options.debug) {
-          console.log("[Treebeard] Request started", { traceId, spanId, path });
+          console.log("[Treebeard] Request started", {
+            traceId,
+            spanId,
+            path,
+          });
         }
 
         res.on("finish", () => {
@@ -84,9 +93,15 @@ export function register(options: InstrumentationOptions = {}) {
             // TODO: close span
             console.log("[Treebeard] Request finished", { traceId, spanId });
           }
+
+          treebeard.completeTrace(traceId, spanId, true);
         });
 
         res.on("error", (err: any) => {
+          treebeard.completeTrace(traceId, spanId, false, {
+            error: err,
+          });
+
           if (options.debug) {
             console.log("[Treebeard] Response error", {
               traceId,
@@ -103,6 +118,13 @@ export function register(options: InstrumentationOptions = {}) {
             traceName: `${req.method} ${normalizePath(path)}`,
           },
           () => {
+            if (options.debug) {
+              console.log("[Treebeard] Request starting", { traceId, spanId });
+            }
+            treebeard.startTrace(traceId, spanId, "Request", {
+              method: req.method,
+              path,
+            });
             return originalEmit.apply(this, arguments as any);
           }
         );

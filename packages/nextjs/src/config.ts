@@ -18,7 +18,7 @@ export interface TreebeardConfigOptions {
 
   /**
    * Custom sourcemap upload endpoint
-   * @default 'https://api.treebeard.com/sourcemaps'
+   * @default 'https://api.treebeardhq.com/source_maps'
    */
   uploadUrl?: string;
 
@@ -208,7 +208,7 @@ async function createSourceMapFormData(
 /**
  * Upload sourcemaps to Treebeard
  */
-async function uploadSourceMaps(
+async function uploadSourceMapsImpl(
   options: Required<
     Pick<
       TreebeardConfigOptions,
@@ -321,18 +321,17 @@ export function withTreebeardConfig(
     project: configProject,
     commit: configCommit,
     debug: configDebug,
-    commitEnvVar: configCommitEnvVar,
     ...cleanNextConfig
   } = nextConfig;
 
   const {
     serviceToken = configServiceToken,
     uploadSourceMaps = configUploadSourceMaps ?? true,
-    uploadUrl = configUploadUrl ?? "https://api.treebeard.com/sourcemaps",
+    uploadUrl = configUploadUrl ?? "https://api.treebeardhq.com/source_maps",
     project = configProject,
     commit = configCommit,
     debug = configDebug ?? false,
-    commitEnvVar = configCommitEnvVar ?? "TREEBEARD_COMMIT_SHA",
+    commitEnvVar = "TREEBEARD_COMMIT_SHA",
   } = treebeardOptions;
 
   // Validate service token
@@ -362,11 +361,9 @@ export function withTreebeardConfig(
   // Add commit SHA to environment if available
   if (commitSha) {
     env[commitEnvVar] = commitSha;
-    if (debug) {
-      console.log(
-        `[Treebeard] Injected ${commitEnvVar}=${commitSha} into environment`
-      );
-    }
+    console.log(
+      `[Treebeard] Injected ${commitEnvVar}=${commitSha} into environment`
+    );
   }
 
   // Create the enhanced config using the clean config
@@ -378,40 +375,102 @@ export function withTreebeardConfig(
       cleanNextConfig.productionBrowserSourceMaps ?? true,
   };
 
-  // Wrap the webpack config to add sourcemap upload
-  const originalWebpack = cleanNextConfig.webpack;
-  enhancedConfig.webpack = (config, options) => {
-    // Call original webpack config if it exists
-    if (originalWebpack) {
-      config = originalWebpack(config, options) || config;
-    }
+  // Check if user is using Turbopack by looking for --turbo flag or turbo: true in config
+  const isTurbopack =
+    process.argv.includes("--turbo") || cleanNextConfig.experimental?.turbo;
 
-    // Add sourcemap upload plugin for production builds
-    if (
-      !options.dev &&
-      uploadSourceMaps &&
-      validatedServiceToken &&
-      commitSha
-    ) {
-      if (debug) {
-        console.log("[Treebeard] Adding sourcemap upload to webpack build");
+  if (!isTurbopack) {
+    // Use webpack plugin for traditional webpack builds
+    const originalWebpack = cleanNextConfig.webpack;
+    enhancedConfig.webpack = (config, options) => {
+      // Call original webpack config if it exists
+      if (originalWebpack) {
+        config = originalWebpack(config, options) || config;
       }
 
-      // Add a plugin to upload sourcemaps after build
-      config.plugins = config.plugins || [];
-      config.plugins.push(
-        new SourceMapUploadPlugin({
-          serviceToken: validatedServiceToken,
-          uploadUrl,
-          project: projectName,
-          commit: commitSha,
-          debug,
-        })
-      );
-    }
+      // Add sourcemap upload plugin for production builds
+      if (
+        !options.dev &&
+        uploadSourceMaps &&
+        validatedServiceToken &&
+        commitSha
+      ) {
+        if (debug) {
+          console.log("[Treebeard] Adding sourcemap upload to webpack build");
+        }
 
-    return config;
-  };
+        // Add a plugin to upload sourcemaps after build
+        config.plugins = config.plugins || [];
+        config.plugins.push(
+          new SourceMapUploadPlugin({
+            serviceToken: validatedServiceToken,
+            uploadUrl,
+            project: projectName,
+            commit: commitSha,
+            debug,
+          })
+        );
+      }
+
+      return config;
+    };
+  } else {
+    // For Turbopack, we'll need to use a different approach since webpack hooks aren't available
+    // if (uploadSourceMaps && validatedServiceToken && commitSha) {
+    //   if (debug) {
+    //     console.log(
+    //       "[Treebeard] Turbopack detected, setting up post-build sourcemap upload"
+    //     );
+    //   }
+    //   // Store upload configuration for later use
+    //   const uploadConfig = {
+    //     serviceToken: validatedServiceToken,
+    //     uploadUrl,
+    //     project: projectName,
+    //     commit: commitSha,
+    //     debug,
+    //   };
+    //   // Only set up upload for production builds (not dev)
+    //   if (
+    //     process.env.NODE_ENV === "production" &&
+    //     process.env.NEXT_PHASE === "phase-production-build"
+    //   ) {
+    //     const handleExit = async () => {
+    //       try {
+    //         if (debug) {
+    //           console.log(
+    //             "[Treebeard] Production build ending, uploading sourcemaps..."
+    //           );
+    //         }
+    //         await uploadSourceMapsImpl(uploadConfig);
+    //       } catch (error) {
+    //         if (debug) {
+    //           console.error(
+    //             "[Treebeard] Post-build sourcemap upload failed:",
+    //             error
+    //           );
+    //         }
+    //       }
+    //     };
+    //     // Register exit handlers for production builds only
+    //     process.on("beforeExit", handleExit);
+    //     process.on("exit", () => {
+    //       // For synchronous cleanup, we can't await here
+    //       if (debug) {
+    //         console.log("[Treebeard] Production build process exiting");
+    //       }
+    //     });
+    //   } else if (debug) {
+    //     console.log(
+    //       "[Treebeard] Turbopack dev mode - skipping sourcemap upload setup"
+    //     );
+    //   }
+    // } else if (debug) {
+    //   console.log(
+    //     "[Treebeard] Turbopack detected, but sourcemap upload not configured"
+    //   );
+    // }
+  }
 
   return enhancedConfig;
 }
@@ -450,7 +509,7 @@ class SourceMapUploadPlugin {
             );
           }
 
-          await uploadSourceMaps(this.options);
+          await uploadSourceMapsImpl(this.options);
 
           if (this.options.debug) {
             console.log("[Treebeard] Sourcemap upload completed");

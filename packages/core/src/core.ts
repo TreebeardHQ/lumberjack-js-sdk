@@ -42,7 +42,6 @@ export class TreebeardCore extends EventEmitter {
       });
     }
 
-    this.setupGlobalExceptionHandling();
     this.startFlushTimer();
 
     if (this.config.captureConsole) {
@@ -58,81 +57,6 @@ export class TreebeardCore extends EventEmitter {
 
   static getInstance(): TreebeardCore | null {
     return TreebeardCore.instance;
-  }
-
-  private setupGlobalExceptionHandling(): void {
-    if (!this.config.captureUnhandled) {
-      if (this.config.debug) {
-        console.log(
-          "[Treebeard] Skipping global exception handling (disabled)"
-        );
-      }
-      return;
-    }
-
-    const runtime = detectRuntime();
-
-    if (this.config.debug) {
-      console.log(
-        "[Treebeard] Setting up global exception handling for runtime:",
-        runtime
-      );
-    }
-
-    // Node.js environment
-    if (runtime.isNode && runtime.hasProcess) {
-      process.on("uncaughtException", (error: Error) => {
-        this.logError("Uncaught Exception", error);
-        this.flush().finally(() => {
-          process.exit(1);
-        });
-      });
-
-      process.on("unhandledRejection", (reason: any, promise: Promise<any>) => {
-        const error =
-          reason instanceof Error ? reason : new Error(String(reason));
-        this.logError("Unhandled Promise Rejection", error, {
-          promise: promise.toString(),
-        });
-      });
-    }
-
-    // Browser environment
-    if (runtime.isBrowser && runtime.hasWindow) {
-      window.addEventListener("error", (event: ErrorEvent) => {
-        this.logError("Global Error", event.error || new Error(event.message), {
-          filename: event.filename,
-          lineno: event.lineno,
-          colno: event.colno,
-        });
-      });
-
-      window.addEventListener(
-        "unhandledrejection",
-        (event: PromiseRejectionEvent) => {
-          const error =
-            event.reason instanceof Error
-              ? event.reason
-              : new Error(String(event.reason));
-          this.logError("Unhandled Promise Rejection", error);
-        }
-      );
-    }
-
-    // Edge Runtime environment (limited capabilities)
-    if (runtime.isEdgeRuntime) {
-      // In Edge Runtime, we can only capture unhandled promise rejections
-      // using a global handler if available
-      if (typeof addEventListener === "function") {
-        addEventListener("unhandledrejection", (event: any) => {
-          const error =
-            event.reason instanceof Error
-              ? event.reason
-              : new Error(String(event.reason));
-          this.logError("Unhandled Promise Rejection (Edge)", error);
-        });
-      }
-    }
   }
 
   private enableConsoleCapture(): void {
@@ -235,6 +159,7 @@ export class TreebeardCore extends EventEmitter {
         ...metadata,
         tn: metadata.traceName || context?.traceName,
       },
+      exception: metadata.exception,
     };
 
     if (this.config.debug) {
@@ -356,6 +281,13 @@ export class TreebeardCore extends EventEmitter {
     }
 
     try {
+      const commitSha =
+        getEnvironmentValue("TREEBEARD_COMMIT_SHA") ||
+        getEnvironmentValue("VERCEL_GIT_COMMIT_SHA") ||
+        getEnvironmentValue("GITHUB_SHA") ||
+        getEnvironmentValue("CI_COMMIT_SHA") ||
+        getEnvironmentValue("COMMIT_SHA");
+
       const payload = {
         logs: logs.map((log) => ({
           msg: log.message,
@@ -373,6 +305,7 @@ export class TreebeardCore extends EventEmitter {
         })),
         project_name: this.config.projectName,
         sdk_version: "2",
+        commit_sha: commitSha,
       };
 
       if (this.config.debug) {
@@ -416,6 +349,23 @@ export class TreebeardCore extends EventEmitter {
     }
   }
 
+  startTrace(
+    traceId: string,
+    spanId: string,
+    traceName: string,
+    metadata: Record<string, any>
+  ): void {
+    this.log("info", "Beginning {traceName}", {
+      ...metadata,
+      traceId,
+      spanId,
+      traceName,
+      tb_i_tags: {
+        tb_trace_start: true,
+      },
+    });
+  }
+
   completeTrace(
     traceId: string,
     spanId?: string,
@@ -427,12 +377,21 @@ export class TreebeardCore extends EventEmitter {
       : "Request failed";
     const level = success ? "info" : "error";
 
+    const tb_i_tags: Record<string, any> = {};
+
+    if (success) {
+      tb_i_tags.tb_trace_complete_success = true;
+    } else {
+      tb_i_tags.tb_trace_complete_error = false;
+    }
+
     this.log(level, message, {
       ...metadata,
       traceId,
       ...(spanId && { spanId }),
-      _traceEnd: true,
+
       success,
+      tb_i_tags,
     });
   }
 

@@ -13,7 +13,8 @@
     "clean": "npm run clean --workspaces",
     "test": "npm run test --workspaces",
     "lint": "npm run lint --workspaces",
-    "typecheck": "npm run typecheck --workspaces"
+    "typecheck": "npm run typecheck --workspaces",
+    "bump-alpha": "node scripts/bump-alpha.js"
   },
   "publishConfig": {
     "access": "public"
