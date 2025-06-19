@@ -5,7 +5,7 @@ import { TreebeardCore } from "@treebeardhq/core";
 export class TreebeardSpanProcessor implements SpanProcessor {
   constructor(private options: { debug?: boolean | undefined }) {}
 
-  onStart(span: ReadableSpan, parentContext: Context) {
+  onStart(span: ReadableSpan, _parentContext: Context) {
     if (span.attributes["next.span_type"] === "BaseServer.handleRequest") {
       if (this.options.debug) {
         console.debug("[Treebeard] Starting span:", span.name, span);
