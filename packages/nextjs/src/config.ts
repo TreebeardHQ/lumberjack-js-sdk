@@ -121,39 +121,57 @@ function findSourceMapFiles(
 ): Array<{ filePath: string; url: string }> {
   const buildDir = join(process.cwd(), ".next");
   const staticDir = join(buildDir, "static");
+  const serverDir = join(buildDir, "server");
 
-  if (!existsSync(staticDir)) {
-    if (debug) {
-      console.warn("[Treebeard] No .next/static directory found");
-    }
-    return [];
-  }
+  const files: Array<{ filePath: string; url: string }> = [];
 
-  try {
-    // Find all .js.map files in .next/static
-    const sourcemapFiles = findFilesRecursive(staticDir, ".js.map");
-
-    const files = sourcemapFiles.map((filePath: string) => {
-      // Convert file path to URL path for sourcemap mapping
-      const relativePath = relative(staticDir, filePath);
-      const url = `~/_next/static/${relativePath.replace(/\\/g, "/")}`;
-      return { filePath, url };
-    });
-
-    if (debug) {
-      console.log("[Treebeard] Found sourcemap files:", files.length);
-      files.forEach((file: { filePath: string; url: string }) => {
-        console.log(`  ${file.url} -> ${file.filePath}`);
+  // Find client-side source maps in .next/static
+  if (existsSync(staticDir)) {
+    try {
+      const clientSourcemaps = findFilesRecursive(staticDir, ".js.map");
+      
+      clientSourcemaps.forEach((filePath: string) => {
+        const relativePath = relative(staticDir, filePath);
+        const url = `~/_next/static/${relativePath.replace(/\\/g, "/")}`;
+        files.push({ filePath, url });
       });
+    } catch (error) {
+      if (debug) {
+        console.warn("[Treebeard] Error finding client sourcemap files:", error);
+      }
     }
-
-    return files;
-  } catch (error) {
-    if (debug) {
-      console.warn("[Treebeard] Error finding sourcemap files:", error);
-    }
-    return [];
+  } else if (debug) {
+    console.warn("[Treebeard] No .next/static directory found");
   }
+
+  // Find server-side source maps in .next/server
+  if (existsSync(serverDir)) {
+    try {
+      const serverSourcemaps = findFilesRecursive(serverDir, ".js.map");
+      
+      serverSourcemaps.forEach((filePath: string) => {
+        const relativePath = relative(serverDir, filePath);
+        // Server files have a different URL pattern
+        const url = `~/_next/server/${relativePath.replace(/\\/g, "/")}`;
+        files.push({ filePath, url });
+      });
+    } catch (error) {
+      if (debug) {
+        console.warn("[Treebeard] Error finding server sourcemap files:", error);
+      }
+    }
+  } else if (debug) {
+    console.warn("[Treebeard] No .next/server directory found");
+  }
+
+  if (debug) {
+    console.log("[Treebeard] Found sourcemap files:", files.length);
+    files.forEach((file: { filePath: string; url: string }) => {
+      console.log(`  ${file.url} -> ${file.filePath}`);
+    });
+  }
+
+  return files;
 }
 
 /**
@@ -383,6 +401,11 @@ export function withTreebeardConfig(
         config = originalWebpack(config, options) || config;
       }
 
+      // Enable source maps for server-side code in production
+      if (!options.dev && options.isServer) {
+        config.devtool = 'source-map';
+      }
+
       // Add sourcemap upload plugin for production builds
       if (
         !options.dev &&
@@ -519,3 +542,6 @@ class SourceMapUploadPlugin {
     );
   }
 }
+
+// Export internal functions for testing
+export { findSourceMapFiles, createSourceMapFormData, uploadSourceMapsImpl };
