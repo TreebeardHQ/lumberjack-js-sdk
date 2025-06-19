@@ -1,0 +1,258 @@
+import { describe, it, expect } from '@jest/globals';
+import { getCallerInfo } from './get-caller-info.js';
+
+describe('getCallerInfo', () => {
+  function testHelper() {
+    return getCallerInfo();
+  }
+
+  function nestedTestHelper() {
+    return testHelper();
+  }
+
+  async function asyncTestHelper() {
+    return getCallerInfo();
+  }
+
+  describe('Basic Functionality', () => {
+    it('should return caller information for immediate caller', () => {
+      const callerInfo = getCallerInfo();
+      
+      expect(callerInfo).toHaveProperty('file');
+      expect(callerInfo).toHaveProperty('line');
+      expect(callerInfo).toHaveProperty('column');
+      expect(callerInfo).toHaveProperty('func');
+      
+      expect(typeof callerInfo.file).toBe('string');
+      expect(typeof callerInfo.line).toBe('number');
+      expect(typeof callerInfo.column).toBe('number');
+    });
+
+    it('should return function name when called from named function', () => {
+      function namedFunction() {
+        return getCallerInfo();
+      }
+      
+      const callerInfo = namedFunction();
+      expect(callerInfo.func).toBe('namedFunction');
+    });
+
+    it('should return anonymous when called from anonymous function', () => {
+      const callerInfo = (() => getCallerInfo())();
+      expect(callerInfo.func).toBe('anonymous');
+    });
+
+    it('should include file path information', () => {
+      const callerInfo = getCallerInfo();
+      
+      expect(callerInfo.file).toContain('get-caller-info.test');
+      expect(callerInfo.file).toMatch(/\.(js|ts)$/);
+    });
+
+    it('should include line number information', () => {
+      const callerInfo = getCallerInfo();
+      
+      expect(callerInfo.line).toBeGreaterThan(0);
+      expect(Number.isInteger(callerInfo.line)).toBe(true);
+    });
+  });
+
+  describe('Skip Parameter', () => {
+    it('should skip specified number of frames', () => {
+      const directCall = getCallerInfo(0);
+      const helperCall = testHelper();
+      
+      // Both should point to this test function, but at different lines
+      expect(directCall.func).toBe(helperCall.func);
+      expect(directCall.line).not.toBe(helperCall.line);
+    });
+
+    it('should handle skip=1 to get caller of caller', () => {
+      function wrapper() {
+        return getCallerInfo(1);
+      }
+      
+      const callerInfo = wrapper();
+      // Should point to this test function, not the wrapper
+      expect(callerInfo.func).toContain('should handle skip=1');
+    });
+
+    it('should handle nested function calls with skip', () => {
+      const callerInfo = nestedTestHelper();
+      
+      // nestedTestHelper -> testHelper -> getCallerInfo()
+      // With default skip=0, should point to testHelper
+      expect(callerInfo.func).toBe('testHelper');
+    });
+
+    it('should handle large skip values gracefully', () => {
+      const callerInfo = getCallerInfo(100);
+      
+      // Should return empty object when skip exceeds stack depth
+      expect(callerInfo).toEqual({});
+    });
+  });
+
+  describe('Async Context', () => {
+    it('should work in async functions', async () => {
+      const callerInfo = await asyncTestHelper();
+      
+      expect(callerInfo.func).toBe('asyncTestHelper');
+      expect(callerInfo.file).toContain('get-caller-info.test');
+    });
+
+    it('should work in Promise chains', async () => {
+      const callerInfo = await Promise.resolve().then(() => getCallerInfo());
+      
+      expect(callerInfo).toHaveProperty('file');
+      expect(callerInfo).toHaveProperty('line');
+    });
+
+    it('should work in setTimeout callbacks', (done) => {
+      setTimeout(() => {
+        const callerInfo = getCallerInfo();
+        
+        expect(callerInfo).toHaveProperty('file');
+        expect(callerInfo).toHaveProperty('line');
+        done();
+      }, 1);
+    });
+  });
+
+  describe('Method Calls', () => {
+    class TestClass {
+      instanceMethod() {
+        return getCallerInfo();
+      }
+      
+      static staticMethod() {
+        return getCallerInfo();
+      }
+      
+      arrowMethod = () => {
+        return getCallerInfo();
+      }
+    }
+
+    it('should detect instance method calls', () => {
+      const instance = new TestClass();
+      const callerInfo = instance.instanceMethod();
+      
+      expect(callerInfo.func).toBe('instanceMethod');
+    });
+
+    it('should detect static method calls', () => {
+      const callerInfo = TestClass.staticMethod();
+      
+      expect(callerInfo.func).toBe('staticMethod');
+    });
+
+    it('should handle arrow function methods', () => {
+      const instance = new TestClass();
+      const callerInfo = instance.arrowMethod();
+      
+      // Arrow functions may show as 'arrowMethod' or 'anonymous'
+      expect(['arrowMethod', 'anonymous']).toContain(callerInfo.func);
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle being called at module top level', () => {
+      // This test simulates module-level execution
+      const callerInfo = getCallerInfo();
+      
+      expect(callerInfo).toHaveProperty('file');
+      expect(callerInfo).toHaveProperty('line');
+    });
+
+    it('should handle recursive function calls', () => {
+      function recursive(depth: number): any {
+        if (depth === 0) {
+          return getCallerInfo();
+        }
+        return recursive(depth - 1);
+      }
+      
+      const callerInfo = recursive(3);
+      
+      expect(callerInfo.func).toBe('recursive');
+    });
+
+    it('should return consistent results for multiple calls', () => {
+      function testFunction() {
+        const call1 = getCallerInfo();
+        const call2 = getCallerInfo();
+        
+        expect(call1.func).toBe(call2.func);
+        expect(call1.file).toBe(call2.file);
+        // Line numbers should be different
+        expect(call1.line).not.toBe(call2.line);
+      }
+      
+      testFunction();
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should not throw when V8 stack trace API is unavailable', () => {
+      const originalPrepareStackTrace = Error.prepareStackTrace;
+      const originalCaptureStackTrace = Error.captureStackTrace;
+      
+      // Temporarily disable V8 APIs
+      delete (Error as any).prepareStackTrace;
+      delete (Error as any).captureStackTrace;
+      
+      expect(() => getCallerInfo()).not.toThrow();
+      
+      // Restore APIs
+      Error.prepareStackTrace = originalPrepareStackTrace;
+      (Error as any).captureStackTrace = originalCaptureStackTrace;
+    });
+
+    it('should handle corrupted stack traces gracefully', () => {
+      const originalPrepareStackTrace = Error.prepareStackTrace;
+      
+      // Mock prepareStackTrace to return invalid data
+      Error.prepareStackTrace = () => null as any;
+      
+      const callerInfo = getCallerInfo();
+      expect(callerInfo).toEqual({});
+      
+      // Restore original
+      Error.prepareStackTrace = originalPrepareStackTrace;
+    });
+  });
+
+  describe('Return Value Structure', () => {
+    it('should return object with correct property types', () => {
+      const callerInfo = getCallerInfo();
+      
+      if (callerInfo.file !== undefined) {
+        expect(typeof callerInfo.file).toBe('string');
+      }
+      
+      if (callerInfo.line !== undefined) {
+        expect(typeof callerInfo.line).toBe('number');
+        expect(Number.isInteger(callerInfo.line)).toBe(true);
+      }
+      
+      if (callerInfo.column !== undefined) {
+        expect(typeof callerInfo.column).toBe('number');
+        expect(Number.isInteger(callerInfo.column)).toBe(true);
+      }
+      
+      if (callerInfo.func !== undefined) {
+        expect(typeof callerInfo.func).toBe('string');
+      }
+    });
+
+    it('should handle undefined values gracefully', () => {
+      const callerInfo = getCallerInfo(100); // Beyond stack depth
+      
+      expect(callerInfo.file).toBeUndefined();
+      expect(callerInfo.line).toBeUndefined();
+      expect(callerInfo.column).toBeUndefined();
+      expect(callerInfo.func).toBeUndefined();
+    });
+  });
+});
