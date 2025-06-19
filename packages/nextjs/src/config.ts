@@ -39,12 +39,6 @@ export interface TreebeardConfigOptions {
    * @default false
    */
   debug?: boolean;
-
-  /**
-   * Custom environment variable name for the commit SHA
-   * @default 'TREEBEARD_COMMIT_SHA'
-   */
-  commitEnvVar?: string;
 }
 
 /**
@@ -331,8 +325,9 @@ export function withTreebeardConfig(
     project = configProject,
     commit = configCommit,
     debug = configDebug ?? false,
-    commitEnvVar = "TREEBEARD_COMMIT_SHA",
   } = treebeardOptions;
+
+  const commitEnvVar = "TREEBEARD_COMMIT_SHA";
 
   // Validate service token
   const validatedServiceToken = validateServiceToken(serviceToken, debug);

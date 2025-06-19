@@ -1,7 +1,7 @@
 import { EventEmitter } from "events";
 import { TreebeardContext } from "./context.js";
 import { detectRuntime, getEnvironmentValue } from "./runtime.js";
-import { LogEntry, LogLevelType, TreebeardConfig } from "./types.js";
+import { LogEntry, LogLevelType, TraceContext, TreebeardConfig } from "./types.js";
 import { getCallerInfo } from "./util/get-caller-info.js";
 
 export class TreebeardCore extends EventEmitter {
@@ -12,6 +12,7 @@ export class TreebeardCore extends EventEmitter {
   private flushTimer: NodeJS.Timeout | null = null;
   private originalConsoleMethods: Record<string, Function> = {};
   private isShuttingDown = false;
+  private injectionCallbacks: Map<string, () => { traceContext?: Partial<TraceContext>; metadata?: Record<string, any> }> = new Map();
 
   constructor(config: TreebeardConfig = {}) {
     super();
@@ -57,6 +58,16 @@ export class TreebeardCore extends EventEmitter {
 
   static getInstance(): TreebeardCore | null {
     return TreebeardCore.instance;
+  }
+
+  registerInjection(callback: () => { traceContext?: Partial<TraceContext>; metadata?: Record<string, any> }): string {
+    const id = `injection_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    this.injectionCallbacks.set(id, callback);
+    return id;
+  }
+
+  unregisterInjection(id: string): boolean {
+    return this.injectionCallbacks.delete(id);
   }
 
   private enableConsoleCapture(): void {
@@ -144,20 +155,41 @@ export class TreebeardCore extends EventEmitter {
     const context = TreebeardContext.getStore();
     const caller = getCallerInfo(2);
 
+    // Collect data from all injection callbacks
+    let injectedTraceContext: Partial<TraceContext> = {};
+    let injectedMetadata: Record<string, any> = {};
+
+    for (const callback of this.injectionCallbacks.values()) {
+      try {
+        const result = callback();
+        if (result.traceContext) {
+          injectedTraceContext = { ...injectedTraceContext, ...result.traceContext };
+        }
+        if (result.metadata) {
+          injectedMetadata = { ...injectedMetadata, ...result.metadata };
+        }
+      } catch (error) {
+        if (this.config.debug) {
+          console.warn("[Treebeard] Injection callback failed:", error);
+        }
+      }
+    }
+
     const logEntry: LogEntry = {
       message,
       level,
 
       timestamp: Date.now(),
-      traceId: metadata.traceId || context?.traceId,
-      ...((metadata.spanId || context?.spanId) && {
-        spanId: metadata.spanId || context?.spanId,
+      traceId: metadata.traceId || injectedTraceContext.traceId || context?.traceId,
+      ...((metadata.spanId || injectedTraceContext.spanId || context?.spanId) && {
+        spanId: metadata.spanId || injectedTraceContext.spanId || context?.spanId,
       }),
       source: metadata.source || "treebeard-js",
       ...caller,
       props: {
+        ...injectedMetadata,
         ...metadata,
-        tn: metadata.traceName || context?.traceName,
+        tn: metadata.traceName || injectedTraceContext.traceName || context?.traceName,
       },
       exception: metadata.exception,
     };
