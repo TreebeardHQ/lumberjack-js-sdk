@@ -1,5 +1,6 @@
 export { TreebeardContext } from "./context.js";
 export { TreebeardCore } from "./core.js";
+export type { RegisteredObject } from "./object-batch.js";
 
 export { detectRuntime, getEnvironmentValue } from "./runtime.js";
 export type { RuntimeEnvironment } from "./runtime.js";
@@ -56,4 +57,8 @@ export const log = {
       instance.log("fatal", message, metadata || {}, caller);
     }
   },
+};
+
+export const register = (obj?: any) => {
+  TreebeardCore.register(obj);
 };
