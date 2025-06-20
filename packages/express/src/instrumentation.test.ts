@@ -39,7 +39,7 @@ const createMockResponse = (): InstrumentedResponse => {
     getHeaders: jest.fn(() => headers),
     setHeader: jest.fn((name: string, value: any) => { headers[name] = value; }),
     end: jest.fn(),
-    json: jest.fn()
+    json: jest.fn().mockReturnThis() // Return this for chaining
   } as unknown as InstrumentedResponse;
   return mockRes;
 };
@@ -249,37 +249,54 @@ describe('ExpressInstrumentation', () => {
     });
 
     it('should capture response body when using res.json()', () => {
-      ExpressInstrumentation.instrument(app, { captureBody: true });
+      // Initialize TreebeardCore first
+      core = TreebeardCore.init({ 
+        apiKey: 'test-key', 
+        batchSize: 1
+      });
+      
+      // Create a fresh app for this test to avoid instrumentation conflicts
+      const freshApp = createMockApp();
+      ExpressInstrumentation.instrument(freshApp, { captureBody: true });
       
       const req = createMockRequest();
       const res = createMockResponse();
       const next = jest.fn();
       
-      const middleware = (app as any).middleware[0];
+      const middleware = (freshApp as any).middleware[0];
       middleware(req, res, next);
       
       const responseData = { message: 'success', data: [1, 2, 3] };
       
-      // Mock json method behavior
-      (res.json as any) = jest.fn().mockImplementation(function(this: any, body: any) {
-        // Store the response body for capture testing
-        (this as any)._responseBody = body;
-        return this;
-      });
-      
+      // Use the instrumented json method (which was set up by the middleware)
       res.json(responseData);
       
-      fetchMock.mockClear();
+      // Call end which should trigger the log
       res.end();
       
-      const callBody = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+      // Check if any fetch calls were made at all
+      if (fetchMock.mock.calls.length === 0) {
+        fail('No fetch calls were made - middleware may not be working');
+      }
+      
+      // Get the last call (which should be the completion log)
+      const lastCall = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
+      const callBody = JSON.parse(lastCall[1]?.body as string);
       const logEntry = callBody.logs[0];
       
       expect(logEntry.props.body).toEqual(responseData);
     });
 
     it('should handle large response bodies appropriately', () => {
-      ExpressInstrumentation.instrument(app, { 
+      // Initialize TreebeardCore first
+      core = TreebeardCore.init({ 
+        apiKey: 'test-key', 
+        batchSize: 1
+      });
+      
+      // Create a fresh app for this test to avoid instrumentation conflicts
+      const freshApp = createMockApp();
+      ExpressInstrumentation.instrument(freshApp, { 
         captureBody: true,
         maxBodySize: 50 
       });
@@ -288,17 +305,17 @@ describe('ExpressInstrumentation', () => {
       const res = createMockResponse();
       const next = jest.fn();
       
-      const middleware = (app as any).middleware[0];
+      const middleware = (freshApp as any).middleware[0];
       middleware(req, res, next);
       
       const largeData = { data: 'x'.repeat(100) }; // Larger than maxBodySize
       
       res.json(largeData);
-      
-      fetchMock.mockClear();
       res.end();
       
-      const callBody = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+      // Get the last call (which should be the completion log)
+      const lastCall = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
+      const callBody = JSON.parse(lastCall[1]?.body as string);
       const logEntry = callBody.logs[0];
       
       expect(logEntry.props.body).toBe('[BODY_TOO_LARGE]');
@@ -465,14 +482,14 @@ describe('ExpressInstrumentation', () => {
       const error = new Error('Handler error');
       const handler = jest.fn() as any;
       handler.mockRejectedValue(error);
-      const wrappedHandler = ExpressInstrumentation.withTreebeard(handler);
+      const wrappedHandler = ExpressInstrumentation.withTreebeard(handler, 'test-handler');
       
       await expect(wrappedHandler()).rejects.toThrow('Handler error');
       
       expect(fetchMock).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          body: expect.stringContaining('"msg":"Failed handler"')
+          body: expect.stringContaining('"msg":"Failed test-handler"')
         })
       );
     });

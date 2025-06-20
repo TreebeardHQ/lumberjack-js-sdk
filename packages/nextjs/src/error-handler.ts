@@ -8,7 +8,7 @@ export const onRequestError: Instrumentation.onRequestError = async (
   request,
   context
 ) => {
-  let message = "";
+  let message = "Request failed";
 
   const currentSpan = trace.getActiveSpan();
 

@@ -3,12 +3,14 @@ import { TreebeardContext } from "./context.js";
 import { detectRuntime, getEnvironmentValue } from "./runtime.js";
 import { LogEntry, LogLevelType, TraceContext, TreebeardConfig } from "./types.js";
 import { getCallerInfo } from "./util/get-caller-info.js";
+import { ObjectBatch, RegisteredObject } from "./object-batch.js";
 
 export class TreebeardCore extends EventEmitter {
   private static instance: TreebeardCore | null = null;
 
   private config!: Required<TreebeardConfig>;
   private logBuffer: LogEntry[] = [];
+  private objectBatch: ObjectBatch | null = null;
   private flushTimer: NodeJS.Timeout | null = null;
   private originalConsoleMethods: Record<string, Function> = {};
   private isShuttingDown = false;
@@ -43,6 +45,7 @@ export class TreebeardCore extends EventEmitter {
       });
     }
 
+    this.objectBatch = new ObjectBatch(this.config.batchSize, this.config.batchAge);
     this.startFlushTimer();
 
     if (this.config.captureConsole) {
@@ -125,11 +128,15 @@ export class TreebeardCore extends EventEmitter {
         const logLevel: LogLevelType =
           level === "log" ? "info" : (level as LogLevelType);
 
+        // For console capture, we want to skip our console interception wrapper
+        // to get the actual application code that called console.log/error/etc
+        const caller = getCallerInfo(1); // Skip the console wrapper to get actual caller
+
         this.log(logLevel, message, {
           source: "console",
           attributes,
           exception: Object.keys(errorInfo).length > 0 ? errorInfo : undefined,
-        });
+        }, caller);
       };
     });
   }
@@ -148,12 +155,13 @@ export class TreebeardCore extends EventEmitter {
   log(
     level: LogLevelType,
     message: string,
-    metadata: Record<string, any> = {}
+    metadata: Record<string, any> = {},
+    caller?: ReturnType<typeof getCallerInfo>
   ): void {
     if (this.isShuttingDown) return;
 
     const context = TreebeardContext.getStore();
-    const caller = getCallerInfo(2);
+    const callerInfo = caller || getCallerInfo(3); // fallback with deeper skip
 
     // Collect data from all injection callbacks
     let injectedTraceContext: Partial<TraceContext> = {};
@@ -185,7 +193,7 @@ export class TreebeardCore extends EventEmitter {
         spanId: metadata.spanId || injectedTraceContext.spanId || context?.spanId,
       }),
       source: metadata.source || "treebeard-js",
-      ...caller,
+      ...callerInfo,
       props: {
         ...injectedMetadata,
         ...metadata,
@@ -217,6 +225,7 @@ export class TreebeardCore extends EventEmitter {
     error: Error,
     metadata: Record<string, any> = {}
   ): void {
+    const caller = getCallerInfo(1); // Skip this method to get the actual caller
     const errorMetadata = {
       ...metadata,
       exception: {
@@ -226,31 +235,288 @@ export class TreebeardCore extends EventEmitter {
       },
     };
 
-    this.log("error", message, errorMetadata);
+    this.log("error", message, errorMetadata, caller);
   }
 
   trace(message: string, metadata?: Record<string, any>): void {
-    this.log("trace", message, metadata);
+    const caller = getCallerInfo(1); // Skip this method to get the actual caller
+    this.log("trace", message, metadata, caller);
   }
 
   debug(message: string, metadata?: Record<string, any>): void {
-    this.log("debug", message, metadata);
+    const caller = getCallerInfo(1); // Skip this method to get the actual caller
+    this.log("debug", message, metadata, caller);
   }
 
   info(message: string, metadata?: Record<string, any>): void {
-    this.log("info", message, metadata);
+    const caller = getCallerInfo(1); // Skip this method to get the actual caller
+    this.log("info", message, metadata, caller);
   }
 
   warn(message: string, metadata?: Record<string, any>): void {
-    this.log("warn", message, metadata);
+    const caller = getCallerInfo(1); // Skip this method to get the actual caller
+    this.log("warn", message, metadata, caller);
   }
 
   error(message: string, metadata?: Record<string, any>): void {
-    this.log("error", message, metadata);
+    const caller = getCallerInfo(1); // Skip this method to get the actual caller
+    this.log("error", message, metadata, caller);
   }
 
   fatal(message: string, metadata?: Record<string, any>): void {
-    this.log("fatal", message, metadata);
+    const caller = getCallerInfo(1); // Skip this method to get the actual caller
+    this.log("fatal", message, metadata, caller);
+  }
+
+  registerObject(obj?: any): void {
+    if (this.isShuttingDown) return;
+
+    if (!obj) {
+      if (this.config.debug) {
+        console.warn("[Treebeard] No object provided for registration");
+      }
+      return;
+    }
+
+    // Check if obj is a record (plain object) where keys should be used as names
+    if (this.isPlainRecord(obj)) {
+      // Handle record registration - register each key-value pair
+      for (const [key, value] of Object.entries(obj)) {
+        const formattedObj = this.formatObject(value, key);
+        if (formattedObj) {
+          this.attachToContext(formattedObj);
+          if (this.objectBatch?.add(formattedObj)) {
+            this.flushObjects();
+          }
+        }
+      }
+    } else {
+      // Handle single object registration
+      const formattedObj = this.formatObject(obj);
+      if (formattedObj) {
+        this.attachToContext(formattedObj);
+        if (this.objectBatch?.add(formattedObj)) {
+          this.flushObjects();
+        }
+      }
+    }
+  }
+
+  static register(obj?: any): void {
+    const instance = TreebeardCore.getInstance();
+    if (instance) {
+      instance.registerObject(obj);
+    }
+  }
+
+  private isPlainRecord(obj: any): boolean {
+    if (!obj || typeof obj !== 'object') return false;
+    if (Array.isArray(obj)) return false;
+    
+    // If it has an 'id' field, treat it as a single object to register
+    if (obj.id !== undefined) return false;
+    
+    // Check if it's a plain Object literal (constructor is Object)
+    // This handles cases like { user: userObject, product: productObject }
+    if (obj.constructor === Object) return true;
+    
+    // Don't treat class instances as records
+    return false;
+  }
+
+  private formatObject(objData: any, forcedName?: string): RegisteredObject | null {
+    if (!objData) return null;
+
+    let objDict: Record<string, any>;
+    let className: string | null = null;
+
+    // Convert object to dict if needed
+    if (typeof objData !== 'object' || objData === null) {
+      if (this.config.debug) {
+        console.warn("[Treebeard] Cannot register non-object data");
+      }
+      return null;
+    }
+
+    if (Array.isArray(objData)) {
+      if (this.config.debug) {
+        console.warn("[Treebeard] Cannot register array directly");
+      }
+      return null;
+    }
+
+    // Get class name if it's a class instance
+    if (objData.constructor && objData.constructor.name !== 'Object') {
+      className = objData.constructor.name;
+    }
+
+    // Convert to plain object
+    objDict = { ...objData };
+
+    // Check for ID field and warn if missing
+    if (!objDict.id) {
+      if (this.config.debug) {
+        console.warn("[Treebeard] Object registered without 'id' field. This may cause issues with object tracking.");
+      }
+      return null;
+    }
+
+    // Use forced name (from record key), then explicit name, then class name
+    let name: string | undefined = forcedName || objDict.name;
+    if (!name && className) {
+      name = className.toLowerCase();
+    }
+
+    const objId = objDict.id;
+
+    // Validate and filter fields
+    const fields: Record<string, any> = {};
+    for (const [key, value] of Object.entries(objDict)) {
+      if (key === 'name' || key === 'id') {
+        continue;
+      }
+
+      const fieldValue = this.formatField(key, value);
+      if (fieldValue !== null) {
+        fields[key] = fieldValue;
+      }
+    }
+
+    return {
+      name,
+      id: objId,
+      fields
+    };
+  }
+
+  private formatField(_key: string, value: any): any {
+    // Check for numbers
+    if (typeof value === 'number') {
+      return value;
+    }
+
+    // Check for booleans
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    // Check for dates
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+
+    // Check for searchable strings (under 1024 chars)
+    if (typeof value === 'string') {
+      if (value.length <= 1024) {
+        // Simple heuristic: if it looks like metadata (short, no newlines)
+        // rather than body text
+        const valid = !value.includes('\n') && !value.includes('\r');
+        if (valid) {
+          return value;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private attachToContext(formattedObj: RegisteredObject): void {
+    const objectName = formattedObj.name;
+    const objectId = formattedObj.id;
+
+    if (objectName && objectId) {
+      // Create context key as {name}_id
+      const contextKey = `${objectName}_id`;
+
+      // Set the context value to the object's ID
+      const context = TreebeardContext.getStore();
+      if (context) {
+        const newContext = { ...context, [contextKey]: objectId };
+        TreebeardContext.run(newContext, () => {
+          // Context is now updated with object ID
+        });
+      }
+
+      if (this.config.debug) {
+        console.log(`[Treebeard] Attached object to context: ${contextKey} = ${objectId}`);
+      }
+    }
+  }
+
+  flushObjects(): number {
+    if (!this.objectBatch) {
+      if (this.config.debug) {
+        console.log("[Treebeard] Object batch not initialized");
+      }
+      return 0;
+    }
+
+    const objects = this.objectBatch.getObjects();
+    const count = objects.length;
+    if (objects.length > 0) {
+      this.sendObjects(objects);
+    }
+
+    return count;
+  }
+
+  private sendObjects(objects: RegisteredObject[]): void {
+    if (!this.config.apiKey) {
+      if (this.config.debug) {
+        console.log("[Treebeard] No API key provided - skipping object registration");
+      }
+      return;
+    }
+
+    const commitSha =
+      getEnvironmentValue("TREEBEARD_COMMIT_SHA") ||
+      getEnvironmentValue("VERCEL_GIT_COMMIT_SHA") ||
+      getEnvironmentValue("GITHUB_SHA") ||
+      getEnvironmentValue("CI_COMMIT_SHA") ||
+      getEnvironmentValue("COMMIT_SHA");
+
+    // Convert endpoint from /logs/batch to /objects/register
+    const objectsEndpoint = this.config.endpoint.replace('/logs/batch', '/objects/register');
+
+    const payload = {
+      objects: objects,
+      project_name: this.config.projectName,
+      sdk_version: "2",
+      commit_sha: commitSha,
+    };
+
+    if (this.config.debug) {
+      console.log(`[Treebeard] Sending ${objects.length} objects to:`, objectsEndpoint);
+    }
+
+    fetch(objectsEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.config.apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    })
+      .then((response) => {
+        if (!response.ok) {
+          console.error(
+            `[Treebeard]: Failed to send objects: ${response.status} ${response.statusText}`
+          );
+          if (this.config.debug) {
+            console.log("[Treebeard] Response details:", {
+              status: response.status,
+              statusText: response.statusText,
+            });
+          }
+        } else {
+          if (this.config.debug) {
+            console.log(`[Treebeard] Successfully sent ${objects.length} objects`);
+          }
+        }
+      })
+      .catch((error) => {
+        console.error("[Treebeard]: Error sending objects:", error);
+      });
   }
 
   private startFlushTimer(): void {
@@ -387,6 +653,7 @@ export class TreebeardCore extends EventEmitter {
     traceName: string,
     metadata: Record<string, any>
   ): void {
+    const caller = getCallerInfo(1); // Skip this method to get the actual caller
     this.log("info", "Beginning {traceName}", {
       ...metadata,
       traceId,
@@ -395,7 +662,7 @@ export class TreebeardCore extends EventEmitter {
       tb_i_tags: {
         tb_trace_start: true,
       },
-    });
+    }, caller);
   }
 
   completeTrace(
@@ -417,6 +684,7 @@ export class TreebeardCore extends EventEmitter {
       tb_i_tags.tb_trace_complete_error = false;
     }
 
+    const caller = getCallerInfo(1); // Skip this method to get the actual caller
     this.log(level, message, {
       ...metadata,
       traceId,
@@ -424,7 +692,7 @@ export class TreebeardCore extends EventEmitter {
 
       success,
       tb_i_tags,
-    });
+    }, caller);
   }
 
   async shutdown(): Promise<void> {
@@ -441,6 +709,7 @@ export class TreebeardCore extends EventEmitter {
 
     this.disableConsoleCapture();
     await this.flush();
+    this.flushObjects();
 
     TreebeardCore.instance = null;
   }
