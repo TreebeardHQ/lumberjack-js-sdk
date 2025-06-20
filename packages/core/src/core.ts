@@ -125,11 +125,15 @@ export class TreebeardCore extends EventEmitter {
         const logLevel: LogLevelType =
           level === "log" ? "info" : (level as LogLevelType);
 
+        // For console capture, we want to skip our console interception wrapper
+        // to get the actual application code that called console.log/error/etc
+        const caller = getCallerInfo(1); // Skip the console wrapper to get actual caller
+
         this.log(logLevel, message, {
           source: "console",
           attributes,
           exception: Object.keys(errorInfo).length > 0 ? errorInfo : undefined,
-        });
+        }, caller);
       };
     });
   }
@@ -148,12 +152,13 @@ export class TreebeardCore extends EventEmitter {
   log(
     level: LogLevelType,
     message: string,
-    metadata: Record<string, any> = {}
+    metadata: Record<string, any> = {},
+    caller?: ReturnType<typeof getCallerInfo>
   ): void {
     if (this.isShuttingDown) return;
 
     const context = TreebeardContext.getStore();
-    const caller = getCallerInfo(2);
+    const callerInfo = caller || getCallerInfo(3); // fallback with deeper skip
 
     // Collect data from all injection callbacks
     let injectedTraceContext: Partial<TraceContext> = {};
@@ -185,7 +190,7 @@ export class TreebeardCore extends EventEmitter {
         spanId: metadata.spanId || injectedTraceContext.spanId || context?.spanId,
       }),
       source: metadata.source || "treebeard-js",
-      ...caller,
+      ...callerInfo,
       props: {
         ...injectedMetadata,
         ...metadata,
@@ -217,6 +222,7 @@ export class TreebeardCore extends EventEmitter {
     error: Error,
     metadata: Record<string, any> = {}
   ): void {
+    const caller = getCallerInfo(1); // Skip this method to get the actual caller
     const errorMetadata = {
       ...metadata,
       exception: {
@@ -226,31 +232,37 @@ export class TreebeardCore extends EventEmitter {
       },
     };
 
-    this.log("error", message, errorMetadata);
+    this.log("error", message, errorMetadata, caller);
   }
 
   trace(message: string, metadata?: Record<string, any>): void {
-    this.log("trace", message, metadata);
+    const caller = getCallerInfo(1); // Skip this method to get the actual caller
+    this.log("trace", message, metadata, caller);
   }
 
   debug(message: string, metadata?: Record<string, any>): void {
-    this.log("debug", message, metadata);
+    const caller = getCallerInfo(1); // Skip this method to get the actual caller
+    this.log("debug", message, metadata, caller);
   }
 
   info(message: string, metadata?: Record<string, any>): void {
-    this.log("info", message, metadata);
+    const caller = getCallerInfo(1); // Skip this method to get the actual caller
+    this.log("info", message, metadata, caller);
   }
 
   warn(message: string, metadata?: Record<string, any>): void {
-    this.log("warn", message, metadata);
+    const caller = getCallerInfo(1); // Skip this method to get the actual caller
+    this.log("warn", message, metadata, caller);
   }
 
   error(message: string, metadata?: Record<string, any>): void {
-    this.log("error", message, metadata);
+    const caller = getCallerInfo(1); // Skip this method to get the actual caller
+    this.log("error", message, metadata, caller);
   }
 
   fatal(message: string, metadata?: Record<string, any>): void {
-    this.log("fatal", message, metadata);
+    const caller = getCallerInfo(1); // Skip this method to get the actual caller
+    this.log("fatal", message, metadata, caller);
   }
 
   private startFlushTimer(): void {
@@ -387,6 +399,7 @@ export class TreebeardCore extends EventEmitter {
     traceName: string,
     metadata: Record<string, any>
   ): void {
+    const caller = getCallerInfo(1); // Skip this method to get the actual caller
     this.log("info", "Beginning {traceName}", {
       ...metadata,
       traceId,
@@ -395,7 +408,7 @@ export class TreebeardCore extends EventEmitter {
       tb_i_tags: {
         tb_trace_start: true,
       },
-    });
+    }, caller);
   }
 
   completeTrace(
@@ -417,6 +430,7 @@ export class TreebeardCore extends EventEmitter {
       tb_i_tags.tb_trace_complete_error = false;
     }
 
+    const caller = getCallerInfo(1); // Skip this method to get the actual caller
     this.log(level, message, {
       ...metadata,
       traceId,
@@ -424,7 +438,7 @@ export class TreebeardCore extends EventEmitter {
 
       success,
       tb_i_tags,
-    });
+    }, caller);
   }
 
   async shutdown(): Promise<void> {

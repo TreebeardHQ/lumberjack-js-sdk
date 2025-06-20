@@ -85,12 +85,7 @@ describe('Exported Log Functions', () => {
     });
 
     it('should delegate to core instance methods', () => {
-      const traceSpy = jest.spyOn(core, 'trace');
-      const debugSpy = jest.spyOn(core, 'debug');
-      const infoSpy = jest.spyOn(core, 'info');
-      const warnSpy = jest.spyOn(core, 'warn');
-      const errorSpy = jest.spyOn(core, 'error');
-      const fatalSpy = jest.spyOn(core, 'fatal');
+      const logSpy = jest.spyOn(core, 'log');
 
       log.trace('trace message');
       log.debug('debug message');
@@ -99,21 +94,21 @@ describe('Exported Log Functions', () => {
       log.error('error message');
       log.fatal('fatal message');
 
-      expect(traceSpy).toHaveBeenCalledWith('trace message', undefined);
-      expect(debugSpy).toHaveBeenCalledWith('debug message', undefined);
-      expect(infoSpy).toHaveBeenCalledWith('info message', undefined);
-      expect(warnSpy).toHaveBeenCalledWith('warn message', undefined);
-      expect(errorSpy).toHaveBeenCalledWith('error message', undefined);
-      expect(fatalSpy).toHaveBeenCalledWith('fatal message', undefined);
+      expect(logSpy).toHaveBeenCalledWith('trace', 'trace message', {}, expect.anything());
+      expect(logSpy).toHaveBeenCalledWith('debug', 'debug message', {}, expect.anything());
+      expect(logSpy).toHaveBeenCalledWith('info', 'info message', {}, expect.anything());
+      expect(logSpy).toHaveBeenCalledWith('warn', 'warn message', {}, expect.anything());
+      expect(logSpy).toHaveBeenCalledWith('error', 'error message', {}, expect.anything());
+      expect(logSpy).toHaveBeenCalledWith('fatal', 'fatal message', {}, expect.anything());
     });
 
     it('should pass metadata correctly', () => {
-      const infoSpy = jest.spyOn(core, 'info');
+      const logSpy = jest.spyOn(core, 'log');
       const metadata = { userId: '123', action: 'test' };
 
       log.info('test message', metadata);
 
-      expect(infoSpy).toHaveBeenCalledWith('test message', metadata);
+      expect(logSpy).toHaveBeenCalledWith('info', 'test message', metadata, expect.anything());
     });
 
     it('should trigger API calls for each log level', () => {
@@ -165,11 +160,11 @@ describe('Exported Log Functions', () => {
       // Should be the same instance (singleton)
       expect(core1).toBe(core2);
       
-      const infoSpy = jest.spyOn(core1, 'info');
+      const logSpy = jest.spyOn(core1, 'log');
       
       log.info('test message');
       
-      expect(infoSpy).toHaveBeenCalledWith('test message', undefined);
+      expect(logSpy).toHaveBeenCalledWith('info', 'test message', {}, expect.anything());
       
       core = core1; // For cleanup
     });
