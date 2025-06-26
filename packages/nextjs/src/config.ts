@@ -129,15 +129,18 @@ function findSourceMapFiles(
   if (existsSync(staticDir)) {
     try {
       const clientSourcemaps = findFilesRecursive(staticDir, ".js.map");
-      
+
       clientSourcemaps.forEach((filePath: string) => {
         const relativePath = relative(staticDir, filePath);
-        const url = `~/_next/static/${relativePath.replace(/\\/g, "/")}`;
+        const url = `.next/static/${relativePath.replace(/\\/g, "/")}`;
         files.push({ filePath, url });
       });
     } catch (error) {
       if (debug) {
-        console.warn("[Treebeard] Error finding client sourcemap files:", error);
+        console.warn(
+          "[Treebeard] Error finding client sourcemap files:",
+          error
+        );
       }
     }
   } else if (debug) {
@@ -148,16 +151,19 @@ function findSourceMapFiles(
   if (existsSync(serverDir)) {
     try {
       const serverSourcemaps = findFilesRecursive(serverDir, ".js.map");
-      
+
       serverSourcemaps.forEach((filePath: string) => {
         const relativePath = relative(serverDir, filePath);
         // Server files have a different URL pattern
-        const url = `~/_next/server/${relativePath.replace(/\\/g, "/")}`;
+        const url = `.next/server/${relativePath.replace(/\\/g, "/")}`;
         files.push({ filePath, url });
       });
     } catch (error) {
       if (debug) {
-        console.warn("[Treebeard] Error finding server sourcemap files:", error);
+        console.warn(
+          "[Treebeard] Error finding server sourcemap files:",
+          error
+        );
       }
     }
   } else if (debug) {
@@ -403,7 +409,7 @@ export function withTreebeardConfig(
 
       // Enable source maps for server-side code in production
       if (!options.dev && options.isServer) {
-        config.devtool = 'source-map';
+        config.devtool = "source-map";
       }
 
       // Add sourcemap upload plugin for production builds
@@ -544,4 +550,4 @@ class SourceMapUploadPlugin {
 }
 
 // Export internal functions for testing
-export { findSourceMapFiles, createSourceMapFormData, uploadSourceMapsImpl };
+export { createSourceMapFormData, findSourceMapFiles, uploadSourceMapsImpl };

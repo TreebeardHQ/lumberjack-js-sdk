@@ -432,4 +432,187 @@ describe('Register Functionality', () => {
       expect(fetchMock).not.toHaveBeenCalled();
     });
   });
+
+  describe('Object caching and checksums', () => {
+    it('should not re-register identical objects', () => {
+      const testObject = {
+        id: 'cache-test-123',
+        name: 'cached-object',
+        status: 'active',
+        count: 42
+      };
+
+      // First registration
+      TreebeardCore.register(testObject);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      // Clear fetch mock to verify no additional calls
+      fetchMock.mockClear();
+
+      // Second registration with identical data
+      TreebeardCore.register(testObject);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('should re-register objects when data changes', () => {
+      const testObject = {
+        id: 'cache-change-123',
+        name: 'changing-object',
+        status: 'active',
+        count: 42
+      };
+
+      // First registration
+      TreebeardCore.register(testObject);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      // Clear fetch mock
+      fetchMock.mockClear();
+
+      // Change object data
+      const changedObject = {
+        id: 'cache-change-123',
+        name: 'changing-object',
+        status: 'inactive', // Changed status
+        count: 42
+      };
+
+      // Second registration with changed data
+      TreebeardCore.register(changedObject);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      // Verify the updated data was sent
+      const callBody = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+      expect(callBody.objects[0].fields.status).toBe('inactive');
+    });
+
+    it('should always attach to context even when cached', () => {
+      const testObject = {
+        id: 'context-cache-123',
+        name: 'context-object',
+        value: 'test'
+      };
+
+      // Mock TreebeardContext to verify context attachment
+      const mockContext = { traceId: 'trace-123' };
+      const mockGetStore = jest.fn().mockReturnValue(mockContext);
+      const mockRun = jest.fn();
+      
+      const TreebeardContext = require('./context.js').TreebeardContext;
+      TreebeardContext.getStore = mockGetStore;
+      TreebeardContext.run = mockRun;
+
+      // First registration - should register and attach to context
+      TreebeardCore.register(testObject);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(mockRun).toHaveBeenCalledTimes(1);
+
+      // Clear mocks
+      fetchMock.mockClear();
+      mockRun.mockClear();
+
+      // Second registration - should NOT register but SHOULD attach to context
+      TreebeardCore.register(testObject);
+      expect(fetchMock).not.toHaveBeenCalled(); // No network call
+      expect(mockRun).toHaveBeenCalledTimes(1); // Still attached to context
+
+      // Verify context attachment details
+      expect(mockRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          'context-object_id': 'context-cache-123'
+        }),
+        expect.any(Function)
+      );
+    });
+
+    it('should handle record objects with caching', () => {
+      const user = { id: 'user-cache-123', email: 'user@test.com' };
+      const product = { id: 'product-cache-456', price: 99.99 };
+
+      // First registration of record
+      TreebeardCore.register({ user, product });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      // Clear fetch mock
+      fetchMock.mockClear();
+
+      // Second registration with same data
+      TreebeardCore.register({ user, product });
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      // Clear fetch mock
+      fetchMock.mockClear();
+
+      // Change one object in the record
+      const updatedUser = { id: 'user-cache-123', email: 'newemail@test.com' };
+      TreebeardCore.register({ user: updatedUser, product });
+
+      // Should only register the changed user object
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const callBody = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+      expect(callBody.objects[0].id).toBe('user-cache-123');
+      expect(callBody.objects[0].fields.email).toBe('newemail@test.com');
+    });
+
+    it('should generate different checksums for different field values', () => {
+      const obj1 = { id: 'checksum-test', name: 'object', value: 'A' };
+      const obj2 = { id: 'checksum-test', name: 'object', value: 'B' };
+
+      // First object
+      TreebeardCore.register(obj1);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      // Clear fetch mock
+      fetchMock.mockClear();
+
+      // Second object with different value should register
+      TreebeardCore.register(obj2);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('should generate same checksum for equivalent objects with different field order', () => {
+      const obj1 = { id: 'order-test', name: 'object', valueA: 'A', valueB: 'B' };
+      const obj2 = { id: 'order-test', name: 'object', valueB: 'B', valueA: 'A' };
+
+      // First object
+      TreebeardCore.register(obj1);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      // Clear fetch mock
+      fetchMock.mockClear();
+
+      // Second object with same data but different field order should NOT register
+      TreebeardCore.register(obj2);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('should clear cache on shutdown', async () => {
+      const testObject = {
+        id: 'shutdown-test-123',
+        name: 'shutdown-object',
+        value: 'test'
+      };
+
+      // Register object
+      TreebeardCore.register(testObject);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      // Shutdown core
+      await core.shutdown();
+
+      // Clear fetch mock
+      fetchMock.mockClear();
+
+      // Create new core instance
+      (TreebeardCore as any).instance = null;
+      core = TreebeardCore.init({ 
+        apiKey: 'test-key', 
+        batchSize: 1
+      });
+
+      // Register same object - should register again since cache was cleared
+      TreebeardCore.register(testObject);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
 });

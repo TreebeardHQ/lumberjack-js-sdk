@@ -15,6 +15,7 @@ export class TreebeardCore extends EventEmitter {
   private originalConsoleMethods: Record<string, Function> = {};
   private isShuttingDown = false;
   private injectionCallbacks: Map<string, () => { traceContext?: Partial<TraceContext>; metadata?: Record<string, any> }> = new Map();
+  private objectCache: Map<string, string> = new Map();
 
   constructor(config: TreebeardConfig = {}) {
     super();
@@ -284,9 +285,14 @@ export class TreebeardCore extends EventEmitter {
       for (const [key, value] of Object.entries(obj)) {
         const formattedObj = this.formatObject(value, key);
         if (formattedObj) {
+          // Always attach to context regardless of cache status
           this.attachToContext(formattedObj);
-          if (this.objectBatch?.add(formattedObj)) {
-            this.flushObjects();
+          
+          // Check cache before adding to batch
+          if (this.shouldRegisterObject(formattedObj)) {
+            if (this.objectBatch?.add(formattedObj)) {
+              this.flushObjects();
+            }
           }
         }
       }
@@ -294,9 +300,14 @@ export class TreebeardCore extends EventEmitter {
       // Handle single object registration
       const formattedObj = this.formatObject(obj);
       if (formattedObj) {
+        // Always attach to context regardless of cache status
         this.attachToContext(formattedObj);
-        if (this.objectBatch?.add(formattedObj)) {
-          this.flushObjects();
+        
+        // Check cache before adding to batch
+        if (this.shouldRegisterObject(formattedObj)) {
+          if (this.objectBatch?.add(formattedObj)) {
+            this.flushObjects();
+          }
         }
       }
     }
@@ -418,6 +429,60 @@ export class TreebeardCore extends EventEmitter {
     }
 
     return null;
+  }
+
+  private shouldRegisterObject(formattedObj: RegisteredObject): boolean {
+    const objId = formattedObj.id;
+    const checksum = this.calculateObjectChecksum(formattedObj);
+    
+    // Check if we've seen this object with this exact data before
+    const cachedChecksum = this.objectCache.get(objId);
+    
+    if (cachedChecksum === checksum) {
+      if (this.config.debug) {
+        console.log(`[Treebeard] Object ${objId} unchanged (checksum: ${checksum.substring(0, 8)}...), skipping registration`);
+      }
+      return false;
+    }
+    
+    // Object is new or changed, update cache
+    this.objectCache.set(objId, checksum);
+    
+    if (this.config.debug) {
+      console.log(`[Treebeard] Object ${objId} ${cachedChecksum ? 'changed' : 'new'} (checksum: ${checksum.substring(0, 8)}...), will register`);
+    }
+    
+    return true;
+  }
+
+  private calculateObjectChecksum(formattedObj: RegisteredObject): string {
+    // Create a stable string representation for hashing
+    const dataToHash = {
+      name: formattedObj.name,
+      id: formattedObj.id,
+      fields: formattedObj.fields
+    };
+    
+    // Sort fields to ensure consistent ordering
+    const sortedFields: Record<string, any> = {};
+    Object.keys(dataToHash.fields || {})
+      .sort()
+      .forEach(key => {
+        sortedFields[key] = dataToHash.fields[key];
+      });
+    
+    const normalizedData = {
+      ...dataToHash,
+      fields: sortedFields
+    };
+    
+    // Simple hash function (djb2 algorithm)
+    const str = JSON.stringify(normalizedData);
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) + hash) + str.charCodeAt(i);
+    }
+    return Math.abs(hash).toString(16);
   }
 
   private attachToContext(formattedObj: RegisteredObject): void {
@@ -710,6 +775,9 @@ export class TreebeardCore extends EventEmitter {
     this.disableConsoleCapture();
     await this.flush();
     this.flushObjects();
+    
+    // Clear object cache
+    this.objectCache.clear();
 
     TreebeardCore.instance = null;
   }
