@@ -120,3 +120,6 @@ coverage/
 
 # TypeScript incremental build
 *.tsbuildinfo
+
+# Treebeard generated files
+.treebeard/

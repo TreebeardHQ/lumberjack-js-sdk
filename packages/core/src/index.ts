@@ -9,6 +9,9 @@ export type {
   LogLevelType,
   TraceContext,
   TreebeardConfig,
+  GatekeeperResponse,
+  GatekeeperSchema,
+  GatekeeperResult,
 } from "./types.js";
 
 import { TreebeardCore } from "./core.js";
@@ -61,4 +64,16 @@ export const log = {
 
 export const register = (obj?: any) => {
   TreebeardCore.register(obj);
+};
+
+// Export a convenient namespace for the API
+export const Treebeard = {
+  init: TreebeardCore.init,
+  gatekeeper: (key: string) => {
+    const instance = TreebeardCore.getInstance();
+    if (!instance) {
+      throw new Error("[Treebeard] SDK not initialized. Call Treebeard.init() first.");
+    }
+    return instance.gatekeeper.gatekeeper(key);
+  },
 };

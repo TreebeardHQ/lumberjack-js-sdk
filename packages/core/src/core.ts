@@ -4,6 +4,7 @@ import { detectRuntime, getEnvironmentValue } from "./runtime.js";
 import { LogEntry, LogLevelType, TraceContext, TreebeardConfig } from "./types.js";
 import { getCallerInfo } from "./util/get-caller-info.js";
 import { ObjectBatch, RegisteredObject } from "./object-batch.js";
+import { Gatekeeper } from "./gatekeeper.js";
 
 export class TreebeardCore extends EventEmitter {
   private static instance: TreebeardCore | null = null;
@@ -16,6 +17,7 @@ export class TreebeardCore extends EventEmitter {
   private isShuttingDown = false;
   private injectionCallbacks: Map<string, () => { traceContext?: Partial<TraceContext>; metadata?: Record<string, any> }> = new Map();
   private objectCache: Map<string, string> = new Map();
+  private _gatekeeper: Gatekeeper | null = null;
 
   constructor(config: TreebeardConfig = {}) {
     super();
@@ -37,6 +39,8 @@ export class TreebeardCore extends EventEmitter {
       captureConsole: config.captureConsole || false,
       captureUnhandled: config.captureUnhandled !== false,
       debug: config.debug || false,
+      serviceToken: config.serviceToken || getEnvironmentValue("TREEBEARD_SERVICE_TOKEN") || "",
+      gatekeeperEndpoint: config.gatekeeperEndpoint || getEnvironmentValue("TREEBEARD_GATEKEEPER_ENDPOINT") || "https://api.treebeardhq.com/gatekeeper",
     };
 
     if (this.config.debug) {
@@ -758,6 +762,17 @@ export class TreebeardCore extends EventEmitter {
       success,
       tb_i_tags,
     }, caller);
+  }
+
+  getConfig(): Required<TreebeardConfig> {
+    return this.config;
+  }
+
+  get gatekeeper(): Gatekeeper {
+    if (!this._gatekeeper) {
+      this._gatekeeper = new Gatekeeper(this);
+    }
+    return this._gatekeeper;
   }
 
   async shutdown(): Promise<void> {

@@ -58,6 +58,8 @@ export interface TreebeardConfig {
   captureConsole?: boolean;
   captureUnhandled?: boolean;
   debug?: boolean;
+  serviceToken?: string;
+  gatekeeperEndpoint?: string;
 }
 
 export interface TraceContext {
@@ -66,4 +68,17 @@ export interface TraceContext {
   parentSpanId?: string;
   traceName?: string;
   [key: string]: any;
+}
+
+export interface GatekeeperResponse {
+  allowed: boolean;
+}
+
+export interface GatekeeperSchema {
+  gatekeepers: string[];
+}
+
+export interface GatekeeperResult {
+  pass(): Promise<void>;
+  fail(): Promise<void>;
 }
