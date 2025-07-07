@@ -1,6 +1,7 @@
 import { EventEmitter } from "events";
 import { TreebeardContext } from "./context.js";
 import { detectRuntime, getEnvironmentValue } from "./runtime.js";
+import { getCommitSha, getEnvironmentInfo } from "./environment.js";
 import { LogEntry, LogLevelType, TraceContext, TreebeardConfig } from "./types.js";
 import { getCallerInfo } from "./util/get-caller-info.js";
 import { ObjectBatch, RegisteredObject } from "./object-batch.js";
@@ -50,10 +51,12 @@ export class TreebeardCore extends EventEmitter {
     };
 
     if (this.config.debug) {
+      const envInfo = getEnvironmentInfo();
       console.log("[Treebeard] Initializing SDK with config:", {
         ...this.config,
         apiKey: this.config.apiKey ? "[REDACTED]" : "none",
       });
+      console.log("[Treebeard] Environment context:", envInfo);
     }
 
     // Initialize exporter - use provided exporter or create default HttpExporter
@@ -563,12 +566,7 @@ export class TreebeardCore extends EventEmitter {
       return;
     }
 
-    const commitSha =
-      getEnvironmentValue("TREEBEARD_COMMIT_SHA") ||
-      getEnvironmentValue("VERCEL_GIT_COMMIT_SHA") ||
-      getEnvironmentValue("GITHUB_SHA") ||
-      getEnvironmentValue("CI_COMMIT_SHA") ||
-      getEnvironmentValue("COMMIT_SHA");
+    const commitSha = getCommitSha();
 
     // Transform objects to include metadata
     const transformedObjects: EnrichedRegisteredObject[] = objects.map(obj => ({
@@ -592,12 +590,7 @@ export class TreebeardCore extends EventEmitter {
   }
 
   private async sendSpans(spanRequest: EnrichedSpanRequest): Promise<void> {
-    const commitSha =
-      getEnvironmentValue("TREEBEARD_COMMIT_SHA") ||
-      getEnvironmentValue("VERCEL_GIT_COMMIT_SHA") ||
-      getEnvironmentValue("GITHUB_SHA") ||
-      getEnvironmentValue("CI_COMMIT_SHA") ||
-      getEnvironmentValue("COMMIT_SHA");
+    const commitSha = getCommitSha();
 
     // Add metadata to span request
     const enrichedSpanRequest: EnrichedSpanRequest = {
@@ -669,12 +662,7 @@ export class TreebeardCore extends EventEmitter {
       console.log(`[Treebeard] Flushing ${logs.length} log entries`);
     }
 
-    const commitSha =
-      getEnvironmentValue("TREEBEARD_COMMIT_SHA") ||
-      getEnvironmentValue("VERCEL_GIT_COMMIT_SHA") ||
-      getEnvironmentValue("GITHUB_SHA") ||
-      getEnvironmentValue("CI_COMMIT_SHA") ||
-      getEnvironmentValue("COMMIT_SHA");
+    const commitSha = getCommitSha();
 
     // Transform logs to API format with additional metadata
     const transformedLogs: EnrichedLogEntry[] = logs.map((log) => ({

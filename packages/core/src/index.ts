@@ -8,6 +8,21 @@ export { SpanBatch } from "./span-batch.js";
 
 export { detectRuntime, getEnvironmentValue } from "./runtime.js";
 export type { RuntimeEnvironment } from "./runtime.js";
+export { 
+  getCommitSha, 
+  getBranch, 
+  getBuildId, 
+  getDeploymentId, 
+  getEnvironmentName, 
+  getVersion, 
+  getRegion, 
+  getEnvironmentInfo, 
+  getDeploymentContext,
+  isCI,
+  isProduction,
+  isDevelopment
+} from "./environment.js";
+export type { EnvironmentInfo } from "./environment.js";
 export type {
   LogEntry,
   LogLevelType,
