@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { TreebeardCore } from './core.js';
 import { TreebeardContext } from './context.js';
+import { MockExporter } from './__mocks__/mock-exporter.js';
+import type { EnrichedLogEntry, ExportResult } from './exporter.js';
 
 describe('TreebeardCore', () => {
   let core: TreebeardCore;
@@ -358,11 +360,30 @@ describe('TreebeardCore', () => {
     });
 
     it('should re-queue logs on error', async () => {
-      // Set up a large batch size so manual flush is needed
-      core = new TreebeardCore({ batchSize: 100, apiKey: 'test-key' });
+      class FailingMockExporter extends MockExporter {
+        private callCount = 0;
+        
+        async exportLogs(logs: EnrichedLogEntry[]): Promise<ExportResult> {
+          this.callCount++;
+          if (this.callCount === 1) {
+            return { success: false, error: new Error('Network error'), itemsExported: 0 };
+          }
+          this.exportedLogs.push(...logs);
+          return { success: true, itemsExported: logs.length };
+        }
+        
+        getCallCount(): number {
+          return this.callCount;
+        }
+      }
       
-      fetchMock.mockRejectedValueOnce(new Error('Network error'))
-              .mockResolvedValueOnce({ ok: true });
+      const failingExporter = new FailingMockExporter();
+      
+      core = new TreebeardCore({ 
+        batchSize: 100, 
+        apiKey: 'test-key',
+        exporter: failingExporter
+      });
       
       core.info('test message');
       
@@ -370,7 +391,8 @@ describe('TreebeardCore', () => {
       await core.flush(); // First attempt - fails and re-queues
       await core.flush(); // Second attempt - should succeed
       
-      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(failingExporter.getCallCount()).toBe(2);
+      expect(failingExporter.exportedLogs).toHaveLength(1); // Should have the log after successful retry
     });
   });
 
@@ -401,6 +423,194 @@ describe('TreebeardCore', () => {
       await core.shutdown();
       
       expect(TreebeardCore.getInstance()).toBeNull();
+    });
+  });
+
+  describe('Exporter Integration', () => {
+    it('should use default HttpExporter when no exporter provided', () => {
+      core = new TreebeardCore({
+        apiKey: 'test-key',
+        endpoint: 'https://api.example.com/logs/batch',
+        projectName: 'test-project'
+      });
+      
+      // We can't directly access the private exporter, but we can verify behavior
+      expect(core).toBeInstanceOf(TreebeardCore);
+    });
+    
+    it('should use provided custom exporter', async () => {
+      const mockExporter = new MockExporter();
+      
+      core = new TreebeardCore({
+        apiKey: 'test-key',
+        projectName: 'test-project',
+        exporter: mockExporter
+      });
+      
+      // Log a message to trigger export
+      core.info('test message');
+      await core.flush();
+      
+      // Verify the mock exporter was used
+      expect(mockExporter.exportedLogs).toHaveLength(1);
+      expect(mockExporter.exportedLogs[0].message).toBe('test message');
+      expect(mockExporter.exportedLogs[0].level).toBe('info');
+    });
+    
+    it('should handle exporter failures gracefully', async () => {
+      const mockExporter = new MockExporter();
+      mockExporter.shouldSucceed = false;
+      mockExporter.errorMessage = 'Export failed';
+      
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      
+      core = new TreebeardCore({
+        apiKey: 'test-key',
+        projectName: 'test-project',
+        exporter: mockExporter,
+        debug: true
+      });
+      
+      core.info('test message');
+      await core.flush();
+      
+      // Verify error was logged
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[Treebeard]: Failed to send logs:',
+        'Export failed'
+      );
+      
+      // Verify logs were re-queued on failure
+      expect(mockExporter.exportedLogs).toHaveLength(0);
+      
+      consoleSpy.mockRestore();
+    });
+    
+    it('should export objects through custom exporter', async () => {
+      const mockExporter = new MockExporter();
+      
+      core = new TreebeardCore({
+        apiKey: 'test-key',
+        projectName: 'test-project',
+        exporter: mockExporter,
+        batchSize: 1, // Force immediate flush
+        batchAge: 10   // Very short batch age
+      });
+      
+      // Register an object to trigger export
+      const testObject = { name: 'test', value: 123 };
+      TreebeardCore.register(testObject);
+      
+      // Wait longer for async processing
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Verify the object was exported
+      expect(mockExporter.exportedObjects).toHaveLength(1);
+      expect(mockExporter.exportedObjects[0].fields).toEqual(testObject);
+    });
+    
+    it('should handle object export failures gracefully', async () => {
+      const mockExporter = new MockExporter();
+      mockExporter.shouldSucceed = false;
+      mockExporter.errorMessage = 'Object export failed';
+      
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      
+      core = new TreebeardCore({
+        apiKey: 'test-key',
+        projectName: 'test-project',
+        exporter: mockExporter,
+        batchSize: 1,
+        batchAge: 10
+      });
+      
+      const testObject = { name: 'test', value: 123 };
+      TreebeardCore.register(testObject);
+      
+      // Wait for async processing
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Verify error was logged
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[Treebeard]: Error in flushObjects:',
+        expect.any(Error)
+      );
+      
+      consoleSpy.mockRestore();
+    });
+    
+    it('should transform logs correctly for exporter', async () => {
+      const mockExporter = new MockExporter();
+      
+      core = new TreebeardCore({
+        apiKey: 'test-key',
+        projectName: 'test-project',
+        exporter: mockExporter
+      });
+      
+      // Create a log entry with all fields
+      core.error('test error message', { customProp: 'customValue' });
+      await core.flush();
+      
+      expect(mockExporter.exportedLogs).toHaveLength(1);
+      const exportedLog = mockExporter.exportedLogs[0];
+      
+      // Verify log transformation
+      expect(exportedLog.message).toBe('test error message');
+      expect(exportedLog.level).toBe('error');
+      expect(exportedLog.msg).toBe('test error message');
+      expect(exportedLog.lvl).toBe('error');
+      expect(exportedLog.project_name).toBe('test-project');
+      expect(exportedLog.sdk_version).toBe('2');
+      expect(exportedLog.props).toEqual({ customProp: 'customValue' });
+      expect(exportedLog.ts).toBeGreaterThan(0);
+    });
+    
+    it('should transform objects correctly for exporter', async () => {
+      const mockExporter = new MockExporter();
+      
+      core = new TreebeardCore({
+        apiKey: 'test-key',
+        projectName: 'test-project',
+        exporter: mockExporter,
+        batchSize: 1,
+        batchAge: 10
+      });
+      
+      const testObject = { name: 'test', nested: { value: 123 } };
+      TreebeardCore.register(testObject);
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      expect(mockExporter.exportedObjects).toHaveLength(1);
+      const exportedObject = mockExporter.exportedObjects[0];
+      
+      // Verify object transformation
+      expect(exportedObject.fields).toEqual(testObject);
+      expect(exportedObject.project_name).toBe('test-project');
+      expect(exportedObject.sdk_version).toBe('2');
+      expect(exportedObject.id).toBeDefined();
+      expect(exportedObject.name).toBeDefined();
+    });
+    
+    it('should include commit SHA in exports when available', async () => {
+      process.env.GITHUB_SHA = 'abc123def456';
+      
+      const mockExporter = new MockExporter();
+      
+      core = new TreebeardCore({
+        apiKey: 'test-key',
+        projectName: 'test-project',
+        exporter: mockExporter
+      });
+      
+      core.info('test message');
+      await core.flush();
+      
+      expect(mockExporter.exportedLogs).toHaveLength(1);
+      expect(mockExporter.exportedLogs[0].commit_sha).toBe('abc123def456');
+      
+      delete process.env.GITHUB_SHA;
     });
   });
 });
