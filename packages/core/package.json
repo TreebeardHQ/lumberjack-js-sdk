@@ -33,6 +33,12 @@
     "README.md",
     "dist/cli"
   ],
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/otlp-transformer": "^0.202.0",
+    "@opentelemetry/resources": "^2.0.1",
+    "@opentelemetry/sdk-trace-node": "^2.0.1"
+  },
   "devDependencies": {
     "@jest/globals": "^30.0.2",
     "@types/jest": "^30.0.0",
