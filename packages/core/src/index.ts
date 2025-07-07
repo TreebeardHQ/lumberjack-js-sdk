@@ -1,6 +1,8 @@
 export { TreebeardContext } from "./context.js";
 export { TreebeardCore } from "./core.js";
 export type { RegisteredObject } from "./object-batch.js";
+export type { Exporter, ExporterConfig, ExportResult, EnrichedLogEntry, EnrichedRegisteredObject } from "./exporter.js";
+export { HttpExporter } from "./http-exporter.js";
 
 export { detectRuntime, getEnvironmentValue } from "./runtime.js";
 export type { RuntimeEnvironment } from "./runtime.js";

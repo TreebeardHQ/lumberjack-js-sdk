@@ -5,11 +5,13 @@ import { LogEntry, LogLevelType, TraceContext, TreebeardConfig } from "./types.j
 import { getCallerInfo } from "./util/get-caller-info.js";
 import { ObjectBatch, RegisteredObject } from "./object-batch.js";
 import { Gatekeeper } from "./gatekeeper.js";
+import type { Exporter, EnrichedLogEntry, EnrichedRegisteredObject } from "./exporter.js";
+import { HttpExporter } from "./http-exporter.js";
 
 export class TreebeardCore extends EventEmitter {
   private static instance: TreebeardCore | null = null;
 
-  private config!: Required<TreebeardConfig>;
+  private config!: Required<Omit<TreebeardConfig, 'exporter'>> & { exporter?: Exporter | undefined };
   private logBuffer: LogEntry[] = [];
   private objectBatch: ObjectBatch | null = null;
   private flushTimer: NodeJS.Timeout | null = null;
@@ -18,6 +20,7 @@ export class TreebeardCore extends EventEmitter {
   private injectionCallbacks: Map<string, () => { traceContext?: Partial<TraceContext>; metadata?: Record<string, any> }> = new Map();
   private objectCache: Map<string, string> = new Map();
   private _gatekeeper: Gatekeeper | null = null;
+  private exporter!: Exporter;
 
   constructor(config: TreebeardConfig = {}) {
     super();
@@ -41,6 +44,7 @@ export class TreebeardCore extends EventEmitter {
       debug: config.debug || false,
       serviceToken: config.serviceToken || getEnvironmentValue("TREEBEARD_SERVICE_TOKEN") || "",
       gatekeeperEndpoint: config.gatekeeperEndpoint || getEnvironmentValue("TREEBEARD_GATEKEEPER_ENDPOINT") || "https://api.treebeardhq.com/gatekeeper",
+      exporter: config.exporter || undefined,
     };
 
     if (this.config.debug) {
@@ -49,6 +53,13 @@ export class TreebeardCore extends EventEmitter {
         apiKey: this.config.apiKey ? "[REDACTED]" : "none",
       });
     }
+
+    // Initialize exporter - use provided exporter or create default HttpExporter
+    this.exporter = config.exporter || new HttpExporter({
+      apiKey: this.config.apiKey,
+      endpoint: this.config.endpoint,
+      projectName: this.config.projectName
+    });
 
     this.objectBatch = new ObjectBatch(this.config.batchSize, this.config.batchAge);
     this.startFlushTimer();
@@ -523,17 +534,17 @@ export class TreebeardCore extends EventEmitter {
     const objects = this.objectBatch.getObjects();
     const count = objects.length;
     if (objects.length > 0) {
-      this.sendObjects(objects);
+      // Fire and forget - don't await to maintain non-blocking behavior
+      this.sendObjects(objects).catch(error => {
+        console.error("[Treebeard]: Error in flushObjects:", error);
+      });
     }
 
     return count;
   }
 
-  private sendObjects(objects: RegisteredObject[]): void {
-    if (!this.config.apiKey) {
-      if (this.config.debug) {
-        console.log("[Treebeard] No API key provided - skipping object registration");
-      }
+  private async sendObjects(objects: RegisteredObject[]): Promise<void> {
+    if (objects.length === 0) {
       return;
     }
 
@@ -544,48 +555,25 @@ export class TreebeardCore extends EventEmitter {
       getEnvironmentValue("CI_COMMIT_SHA") ||
       getEnvironmentValue("COMMIT_SHA");
 
-    // Convert endpoint from /logs/batch to /objects/register
-    const objectsEndpoint = this.config.endpoint.replace('/logs/batch', '/objects/register');
-
-    const payload = {
-      objects: objects,
+    // Transform objects to include metadata
+    const transformedObjects: EnrichedRegisteredObject[] = objects.map(obj => ({
+      ...obj,
       project_name: this.config.projectName,
       sdk_version: "2",
       commit_sha: commitSha,
-    };
+    }));
 
     if (this.config.debug) {
-      console.log(`[Treebeard] Sending ${objects.length} objects to:`, objectsEndpoint);
+      console.log(`[Treebeard] Sending ${objects.length} objects`);
     }
 
-    fetch(objectsEndpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.config.apiKey}`,
-      },
-      body: JSON.stringify(payload),
-    })
-      .then((response) => {
-        if (!response.ok) {
-          console.error(
-            `[Treebeard]: Failed to send objects: ${response.status} ${response.statusText}`
-          );
-          if (this.config.debug) {
-            console.log("[Treebeard] Response details:", {
-              status: response.status,
-              statusText: response.statusText,
-            });
-          }
-        } else {
-          if (this.config.debug) {
-            console.log(`[Treebeard] Successfully sent ${objects.length} objects`);
-          }
-        }
-      })
-      .catch((error) => {
-        console.error("[Treebeard]: Error sending objects:", error);
-      });
+    const result = await this.exporter.exportObjects(transformedObjects);
+
+    if (!result.success) {
+      console.error("[Treebeard]: Failed to send objects:", result.error?.message);
+    } else if (this.config.debug) {
+      console.log(`[Treebeard] Successfully sent ${result.itemsExported} objects`);
+    }
   }
 
   private startFlushTimer(): void {
@@ -634,85 +622,45 @@ export class TreebeardCore extends EventEmitter {
       console.log(`[Treebeard] Flushing ${logs.length} log entries`);
     }
 
-    if (!this.config.apiKey) {
-      if (this.config.debug) {
-        console.log(
-          "[Treebeard] No API key provided - outputting logs to console"
-        );
-      }
-      console.warn(
-        "[Treebeard]: No API key provided - logs will be output to console"
-      );
-      logs.forEach((log) => console.log("[Treebeard]", JSON.stringify(log)));
-      return;
-    }
+    const commitSha =
+      getEnvironmentValue("TREEBEARD_COMMIT_SHA") ||
+      getEnvironmentValue("VERCEL_GIT_COMMIT_SHA") ||
+      getEnvironmentValue("GITHUB_SHA") ||
+      getEnvironmentValue("CI_COMMIT_SHA") ||
+      getEnvironmentValue("COMMIT_SHA");
 
-    try {
-      const commitSha =
-        getEnvironmentValue("TREEBEARD_COMMIT_SHA") ||
-        getEnvironmentValue("VERCEL_GIT_COMMIT_SHA") ||
-        getEnvironmentValue("GITHUB_SHA") ||
-        getEnvironmentValue("CI_COMMIT_SHA") ||
-        getEnvironmentValue("COMMIT_SHA");
+    // Transform logs to API format with additional metadata
+    const transformedLogs: EnrichedLogEntry[] = logs.map((log) => ({
+      ...log,
+      // Add API-specific fields
+      msg: log.message,
+      lvl: log.level,
+      ts: log.timestamp,
+      fl: log.file,
+      ln: log.line,
+      tb: log.exception?.stack,
+      src: log.source,
+      tid: log.traceId,
+      exv: log.exception?.message,
+      ext: log.exception?.name,
+      fn: log.function,
+      // Metadata
+      project_name: this.config.projectName,
+      sdk_version: "2",
+      commit_sha: commitSha,
+    }));
 
-      const payload = {
-        logs: logs.map((log) => ({
-          msg: log.message,
-          lvl: log.level,
-          ts: log.timestamp,
-          fl: log.file,
-          ln: log.line,
-          tb: log.exception?.stack,
-          src: log.source,
-          props: log.props,
-          tid: log.traceId,
-          exv: log.exception?.message,
-          ext: log.exception?.name,
-          fn: log.function,
-        })),
-        project_name: this.config.projectName,
-        sdk_version: "2",
-        commit_sha: commitSha,
-      };
+    const result = await this.exporter.exportLogs(transformedLogs);
 
-      if (this.config.debug) {
-        console.log(
-          `[Treebeard] Sending ${logs.length} logs to:`,
-          this.config.endpoint
-        );
-      }
-
-      const response = await fetch(this.config.endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.config.apiKey}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        console.error(
-          `[Treebeard]: Failed to send logs: ${response.status} ${response.statusText}`
-        );
-        if (this.config.debug) {
-          console.log("[Treebeard] Response details:", {
-            status: response.status,
-            statusText: response.statusText,
-            headers: "Headers object",
-          });
-        }
-      } else {
-        if (this.config.debug) {
-          console.log(`[Treebeard] Successfully sent ${logs.length} logs`);
-        }
-      }
-    } catch (error) {
-      console.error("[Treebeard]: Error sending logs:", error);
+    if (!result.success) {
+      console.error("[Treebeard]: Failed to send logs:", result.error?.message);
       if (this.config.debug) {
         console.log("[Treebeard] Re-queuing logs due to error");
       }
+      // Re-queue logs on failure
       this.logBuffer.unshift(...logs);
+    } else if (this.config.debug) {
+      console.log(`[Treebeard] Successfully sent ${result.itemsExported} logs`);
     }
   }
 
@@ -764,7 +712,7 @@ export class TreebeardCore extends EventEmitter {
     }, caller);
   }
 
-  getConfig(): Required<TreebeardConfig> {
+  getConfig(): Required<Omit<TreebeardConfig, 'exporter'>> & { exporter?: Exporter | undefined } {
     return this.config;
   }
 

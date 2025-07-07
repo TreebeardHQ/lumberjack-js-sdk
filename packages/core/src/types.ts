@@ -48,6 +48,8 @@ export interface LogEntryForAPI {
   fn?: string | undefined;
 }
 
+import type { Exporter } from './exporter.js';
+
 export interface TreebeardConfig {
   apiKey?: string;
   endpoint?: string;
@@ -60,6 +62,7 @@ export interface TreebeardConfig {
   debug?: boolean;
   serviceToken?: string;
   gatekeeperEndpoint?: string;
+  exporter?: Exporter;
 }
 
 export interface TraceContext {
