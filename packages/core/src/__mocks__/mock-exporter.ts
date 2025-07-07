@@ -1,8 +1,9 @@
-import type { Exporter, ExportResult, EnrichedLogEntry, EnrichedRegisteredObject } from '../exporter.js';
+import type { Exporter, ExportResult, EnrichedLogEntry, EnrichedRegisteredObject, EnrichedSpanRequest } from '../exporter.js';
 
 export class MockExporter implements Exporter {
   public exportedLogs: EnrichedLogEntry[] = [];
   public exportedObjects: EnrichedRegisteredObject[] = [];
+  public exportedSpans: EnrichedSpanRequest[] = [];
   public shouldSucceed: boolean = true;
   public errorMessage: string = 'Mock export error';
   
@@ -38,6 +39,25 @@ export class MockExporter implements Exporter {
     };
   }
   
+  async exportSpans(spans: EnrichedSpanRequest): Promise<ExportResult> {
+    if (!this.shouldSucceed) {
+      return {
+        success: false,
+        error: new Error(this.errorMessage),
+        itemsExported: 0
+      };
+    }
+    
+    this.exportedSpans.push(spans);
+    const spanCount = spans.resourceSpans?.reduce((total, rs) => 
+      total + (rs.scopeSpans?.reduce((scopeTotal, ss) => 
+        scopeTotal + (ss.spans?.length || 0), 0) || 0), 0) || 0;
+    return {
+      success: true,
+      itemsExported: spanCount
+    };
+  }
+  
   async shutdown(): Promise<void> {
     // Mock shutdown
   }
@@ -45,6 +65,7 @@ export class MockExporter implements Exporter {
   reset(): void {
     this.exportedLogs = [];
     this.exportedObjects = [];
+    this.exportedSpans = [];
     this.shouldSucceed = true;
     this.errorMessage = 'Mock export error';
   }

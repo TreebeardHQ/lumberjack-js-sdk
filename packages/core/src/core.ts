@@ -5,8 +5,9 @@ import { LogEntry, LogLevelType, TraceContext, TreebeardConfig } from "./types.j
 import { getCallerInfo } from "./util/get-caller-info.js";
 import { ObjectBatch, RegisteredObject } from "./object-batch.js";
 import { Gatekeeper } from "./gatekeeper.js";
-import type { Exporter, EnrichedLogEntry, EnrichedRegisteredObject } from "./exporter.js";
+import type { Exporter, EnrichedLogEntry, EnrichedRegisteredObject, EnrichedSpanRequest } from "./exporter.js";
 import { HttpExporter } from "./http-exporter.js";
+import { SpanBatch, InternalSpan } from "./span-batch.js";
 
 export class TreebeardCore extends EventEmitter {
   private static instance: TreebeardCore | null = null;
@@ -14,6 +15,7 @@ export class TreebeardCore extends EventEmitter {
   private config!: Required<Omit<TreebeardConfig, 'exporter'>> & { exporter?: Exporter | undefined };
   private logBuffer: LogEntry[] = [];
   private objectBatch: ObjectBatch | null = null;
+  private spanBatch: SpanBatch | null = null;
   private flushTimer: NodeJS.Timeout | null = null;
   private originalConsoleMethods: Record<string, Function> = {};
   private isShuttingDown = false;
@@ -62,6 +64,19 @@ export class TreebeardCore extends EventEmitter {
     });
 
     this.objectBatch = new ObjectBatch(this.config.batchSize, this.config.batchAge);
+    this.spanBatch = new SpanBatch({
+      maxBatchSize: this.config.batchSize,
+      maxBatchAge: this.config.batchAge,
+      flushInterval: this.config.flushInterval
+    });
+    
+    // Set up span batch flush handler
+    this.spanBatch.on('flush', (spanRequest: EnrichedSpanRequest) => {
+      this.sendSpans(spanRequest).catch(error => {
+        console.error("[Treebeard]: Error in span flush:", error);
+      });
+    });
+    
     this.startFlushTimer();
 
     if (this.config.captureConsole) {
@@ -576,6 +591,38 @@ export class TreebeardCore extends EventEmitter {
     }
   }
 
+  private async sendSpans(spanRequest: EnrichedSpanRequest): Promise<void> {
+    const commitSha =
+      getEnvironmentValue("TREEBEARD_COMMIT_SHA") ||
+      getEnvironmentValue("VERCEL_GIT_COMMIT_SHA") ||
+      getEnvironmentValue("GITHUB_SHA") ||
+      getEnvironmentValue("CI_COMMIT_SHA") ||
+      getEnvironmentValue("COMMIT_SHA");
+
+    // Add metadata to span request
+    const enrichedSpanRequest: EnrichedSpanRequest = {
+      ...spanRequest,
+      project_name: this.config.projectName,
+      sdk_version: "2",
+      commit_sha: commitSha,
+    };
+
+    if (this.config.debug) {
+      const spanCount = spanRequest.resourceSpans?.reduce((total, rs) => 
+        total + (rs.scopeSpans?.reduce((scopeTotal, ss) => 
+          scopeTotal + (ss.spans?.length || 0), 0) || 0), 0) || 0;
+      console.log(`[Treebeard] Sending ${spanCount} spans`);
+    }
+
+    const result = await this.exporter.exportSpans(enrichedSpanRequest);
+
+    if (!result.success) {
+      console.error("[Treebeard]: Failed to send spans:", result.error?.message);
+    } else if (this.config.debug) {
+      console.log(`[Treebeard] Successfully sent ${result.itemsExported} spans`);
+    }
+  }
+
   private startFlushTimer(): void {
     const runtime = detectRuntime();
 
@@ -682,6 +729,164 @@ export class TreebeardCore extends EventEmitter {
     }, caller);
   }
 
+  /**
+   * Create and start a new span
+   */
+  startSpan(name: string, options: {
+    traceId?: string;
+    parentSpanId?: string;
+    kind?: number;
+    attributes?: Record<string, string | number | boolean>;
+    serviceName?: string;
+  } = {}): string {
+    if (this.isShuttingDown || !this.spanBatch) return '';
+
+    const currentContext = TreebeardContext.getStore();
+    const traceId = options.traceId || currentContext?.traceId || this.generateTraceId();
+    const spanId = this.generateSpanId();
+    const parentSpanId = options.parentSpanId || currentContext?.spanId;
+
+    const span: InternalSpan = {
+      traceId,
+      spanId,
+      parentSpanId,
+      name,
+      kind: options.kind || 1, // INTERNAL by default
+      startTimeNano: this.getTimeNanos(),
+      endTimeNano: 0, // Will be set when span ends
+      attributes: options.attributes,
+      serviceName: options.serviceName || this.config.projectName,
+      instrumentationScope: {
+        name: '@treebeardhq/core',
+        version: '1.0.0'
+      }
+    };
+
+    // Store span temporarily (we'll track active spans for finishing)
+    this.activeSpans = this.activeSpans || new Map();
+    this.activeSpans.set(spanId, span);
+
+    // Update trace context to include this span
+    const existingContext = TreebeardContext.getStore() || {};
+    const newContext = {
+      ...existingContext,
+      traceId,
+      spanId,
+      ...(parentSpanId && { parentSpanId })
+    };
+    
+    TreebeardContext.run(newContext, () => {
+      // Context is now updated with span info
+    });
+
+    if (this.config.debug) {
+      console.log(`[Treebeard] Started span: ${name} (${spanId}) in trace: ${traceId}`);
+    }
+
+    return spanId;
+  }
+
+  /**
+   * Finish a span
+   */
+  finishSpan(spanId: string, options: {
+    status?: { code: number; message?: string };
+    attributes?: Record<string, string | number | boolean>;
+    events?: Array<{
+      name: string;
+      attributes?: Record<string, string | number | boolean>;
+    }>;
+  } = {}): void {
+    if (this.isShuttingDown || !this.spanBatch) return;
+
+    this.activeSpans = this.activeSpans || new Map();
+    const span = this.activeSpans.get(spanId);
+    
+    if (!span) {
+      if (this.config.debug) {
+        console.warn(`[Treebeard] Attempted to finish unknown span: ${spanId}`);
+      }
+      return;
+    }
+
+    // Update span with finish details
+    span.endTimeNano = this.getTimeNanos();
+    span.status = options.status || { code: 1 }; // OK by default
+    
+    if (options.attributes) {
+      span.attributes = { ...span.attributes, ...options.attributes };
+    }
+
+    if (options.events) {
+      span.events = span.events || [];
+      span.events.push(...options.events.map(event => ({
+        timeNano: this.getTimeNanos(),
+        name: event.name,
+        attributes: event.attributes || undefined
+      })));
+    }
+
+    // Add to batch for export
+    this.spanBatch.addSpan(span);
+    
+    // Remove from active spans
+    this.activeSpans.delete(spanId);
+
+    if (this.config.debug) {
+      console.log(`[Treebeard] Finished span: ${span.name} (${spanId})`);
+    }
+  }
+
+  /**
+   * Create a span that automatically measures execution time
+   */
+  async withSpan<T>(
+    name: string, 
+    fn: (spanId: string) => T | Promise<T>,
+    options: {
+      traceId?: string;
+      parentSpanId?: string;
+      kind?: number;
+      attributes?: Record<string, string | number | boolean>;
+      serviceName?: string;
+    } = {}
+  ): Promise<T> {
+    const spanId = this.startSpan(name, options);
+    
+    try {
+      const result = await fn(spanId);
+      this.finishSpan(spanId, { status: { code: 1 } }); // OK
+      return result;
+    } catch (error) {
+      this.finishSpan(spanId, { 
+        status: { code: 2, message: error instanceof Error ? error.message : String(error) } 
+      }); // ERROR
+      throw error;
+    }
+  }
+
+  private activeSpans?: Map<string, InternalSpan>;
+
+  private generateTraceId(): string {
+    // Generate 16-byte (32 hex chars) trace ID
+    return Array.from({ length: 32 }, () => 
+      Math.floor(Math.random() * 16).toString(16)
+    ).join('');
+  }
+
+  private generateSpanId(): string {
+    // Generate 8-byte (16 hex chars) span ID
+    return Array.from({ length: 16 }, () => 
+      Math.floor(Math.random() * 16).toString(16)
+    ).join('');
+  }
+
+  private getTimeNanos(): number {
+    // Convert current time to nanoseconds
+    const hrTime = process.hrtime ? process.hrtime() : [Math.floor(Date.now() / 1000), (Date.now() % 1000) * 1000000];
+    return hrTime[0] * 1000000000 + hrTime[1];
+  }
+
   completeTrace(
     traceId: string,
     spanId?: string,
@@ -738,6 +943,23 @@ export class TreebeardCore extends EventEmitter {
     this.disableConsoleCapture();
     await this.flush();
     this.flushObjects();
+    
+    // Finish any active spans and flush span batch
+    if (this.activeSpans) {
+      for (const [spanId, span] of this.activeSpans) {
+        span.endTimeNano = this.getTimeNanos();
+        span.status = { code: 1 }; // OK
+        this.spanBatch?.addSpan(span);
+        if (this.config.debug) {
+          console.log(`[Treebeard] Auto-finished span during shutdown: ${span.name} (${spanId})`);
+        }
+      }
+      this.activeSpans.clear();
+    }
+    
+    if (this.spanBatch) {
+      this.spanBatch.shutdown();
+    }
     
     // Clear object cache
     this.objectCache.clear();

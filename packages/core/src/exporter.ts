@@ -1,5 +1,6 @@
 import type { LogEntry } from './types.js';
 import type { RegisteredObject } from './object-batch.js';
+import type { IExportTraceServiceRequest } from '@opentelemetry/otlp-transformer/build/src/trace/internal-types';
 
 export interface ExportResult {
   success: boolean;
@@ -37,8 +38,15 @@ export interface EnrichedRegisteredObject extends RegisteredObject {
   commit_sha?: string | undefined;
 }
 
+export interface EnrichedSpanRequest extends IExportTraceServiceRequest {
+  project_name: string;
+  sdk_version: string;
+  commit_sha?: string | undefined;
+}
+
 export interface Exporter {
   exportLogs(logs: EnrichedLogEntry[]): Promise<ExportResult>;
   exportObjects(objects: EnrichedRegisteredObject[]): Promise<ExportResult>;
+  exportSpans(spans: EnrichedSpanRequest): Promise<ExportResult>;
   shutdown?(): Promise<void>;
 }
