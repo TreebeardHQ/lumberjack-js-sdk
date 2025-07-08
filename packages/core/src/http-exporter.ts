@@ -1,5 +1,12 @@
-import type { Exporter, ExporterConfig, ExportResult, EnrichedLogEntry, EnrichedRegisteredObject, EnrichedSpanRequest } from './exporter.js';
-import type { LogEntryForAPI } from './types.js';
+import type {
+  EnrichedLogEntry,
+  EnrichedRegisteredObject,
+  EnrichedSpanRequest,
+  Exporter,
+  ExporterConfig,
+  ExportResult,
+} from "./exporter.js";
+import type { LogEntryForAPI } from "./types.js";
 
 export class HttpExporter implements Exporter {
   private readonly config: ExporterConfig;
@@ -9,10 +16,14 @@ export class HttpExporter implements Exporter {
 
   constructor(config: ExporterConfig) {
     this.config = config;
-    const baseEndpoint = config.endpoint || 'https://api.treebeardhq.com/logs/batch';
+    const baseEndpoint =
+      config.endpoint || "https://api.treebeardhq.com/logs/batch";
     this.logsEndpoint = baseEndpoint;
-    this.objectsEndpoint = baseEndpoint.replace('/logs/batch', '/objects/register');
-    this.spansEndpoint = baseEndpoint.replace('/logs/batch', '/spans/batch');
+    this.objectsEndpoint = baseEndpoint.replace(
+      "/logs/batch",
+      "/objects/register"
+    );
+    this.spansEndpoint = baseEndpoint.replace("/logs/batch", "/spans/batch");
   }
 
   async exportLogs(logs: EnrichedLogEntry[]): Promise<ExportResult> {
@@ -49,27 +60,29 @@ export class HttpExporter implements Exporter {
         tid: log.tid,
         exv: log.exv,
         ext: log.ext,
-        fn: log.fn
+        fn: log.fn,
       }));
 
       const response = await fetch(this.logsEndpoint, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${this.config.apiKey}`,
-          ...this.config.headers
+          ...this.config.headers,
         },
         body: JSON.stringify({
           logs: apiLogs,
           project_name,
           sdk_version,
-          commit_sha
-        })
+          commit_sha,
+        }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to send logs: ${response.status} ${response.statusText} - ${errorText}`);
+        throw new Error(
+          `Failed to send logs: ${response.status} ${response.statusText} - ${errorText}`
+        );
       }
 
       return { success: true, itemsExported: logs.length };
@@ -77,18 +90,29 @@ export class HttpExporter implements Exporter {
       return {
         success: false,
         error: error instanceof Error ? error : new Error(String(error)),
-        itemsExported: 0
+        itemsExported: 0,
       };
     }
   }
 
-  async exportObjects(objects: EnrichedRegisteredObject[]): Promise<ExportResult> {
+  async exportObjects(
+    objects: EnrichedRegisteredObject[]
+  ): Promise<ExportResult> {
     if (objects.length === 0) {
+      if (this.config.debug) {
+        console.debug("[Treebeard] No objects to export");
+      }
       return { success: true, itemsExported: 0 };
     }
 
     if (!this.config.apiKey) {
       // Skip object registration when no API key is provided (backward compatibility)
+      if (this.config.debug) {
+        console.debug(
+          "[Treebeard] No API key provided - objects will be output to console"
+        );
+      }
+
       return { success: true, itemsExported: objects.length };
     }
 
@@ -106,23 +130,25 @@ export class HttpExporter implements Exporter {
       });
 
       const response = await fetch(this.objectsEndpoint, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${this.config.apiKey}`,
-          ...this.config.headers
+          ...this.config.headers,
         },
         body: JSON.stringify({
           objects: cleanObjects,
           project_name,
           sdk_version,
-          commit_sha
-        })
+          commit_sha,
+        }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to send objects: ${response.status} ${response.statusText} - ${errorText}`);
+        throw new Error(
+          `Failed to send objects: ${response.status} ${response.statusText} - ${errorText}`
+        );
       }
 
       return { success: true, itemsExported: objects.length };
@@ -130,13 +156,16 @@ export class HttpExporter implements Exporter {
       return {
         success: false,
         error: error instanceof Error ? error : new Error(String(error)),
-        itemsExported: 0
+        itemsExported: 0,
       };
     }
   }
 
   async exportSpans(spanRequest: EnrichedSpanRequest): Promise<ExportResult> {
     if (!spanRequest.resourceSpans || spanRequest.resourceSpans.length === 0) {
+      if (this.config.debug) {
+        console.debug("[Treebeard] No spans to export");
+      }
       return { success: true, itemsExported: 0 };
     }
 
@@ -155,32 +184,44 @@ export class HttpExporter implements Exporter {
       const commit_sha = spanRequest.commit_sha;
 
       // Clean the span request to remove our custom metadata fields
-      const { project_name: _, sdk_version: __, commit_sha: ___, ...cleanSpanRequest } = spanRequest;
+      const {
+        project_name: _,
+        sdk_version: __,
+        commit_sha: ___,
+        ...cleanSpanRequest
+      } = spanRequest;
 
       const response = await fetch(this.spansEndpoint, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${this.config.apiKey}`,
-          ...this.config.headers
+          ...this.config.headers,
         },
         body: JSON.stringify({
           ...cleanSpanRequest,
           project_name,
           sdk_version,
-          commit_sha
-        })
+          commit_sha,
+        }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to send spans: ${response.status} ${response.statusText} - ${errorText}`);
+        throw new Error(
+          `Failed to send spans: ${response.status} ${response.statusText} - ${errorText}`
+        );
       }
 
       // Count total spans exported
-      const totalSpans = spanRequest.resourceSpans.reduce((total, rs) => 
-        total + (rs.scopeSpans?.reduce((scopeTotal, ss) => 
-          scopeTotal + (ss.spans?.length || 0), 0) || 0), 0
+      const totalSpans = spanRequest.resourceSpans.reduce(
+        (total, rs) =>
+          total +
+          (rs.scopeSpans?.reduce(
+            (scopeTotal, ss) => scopeTotal + (ss.spans?.length || 0),
+            0
+          ) || 0),
+        0
       );
 
       return { success: true, itemsExported: totalSpans };
@@ -188,7 +229,7 @@ export class HttpExporter implements Exporter {
       return {
         success: false,
         error: error instanceof Error ? error : new Error(String(error)),
-        itemsExported: 0
+        itemsExported: 0,
       };
     }
   }

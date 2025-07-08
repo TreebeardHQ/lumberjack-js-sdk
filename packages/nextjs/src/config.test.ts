@@ -97,23 +97,23 @@ describe("Source Map Upload", () => {
 
       // Check client-side source maps have correct URL patterns
       const clientResults = result.filter((file) =>
-        file.url.includes("/_next/static/")
+        file.url.includes(".next/static/")
       );
       expect(clientResults).toHaveLength(clientSourceMaps.length);
 
       clientResults.forEach((file) => {
-        expect(file.url).toMatch(/~\/_next\/static\/.+\.js\.map$/);
+        expect(file.url).toMatch(/\.next\/static\/.+\.js\.map$/);
         expect(file.filePath).toContain(".next/static");
       });
 
       // Check server-side source maps have correct URL patterns
       const serverResults = result.filter((file) =>
-        file.url.includes("/_next/server/")
+        file.url.includes(".next/server/")
       );
       expect(serverResults).toHaveLength(serverSourceMaps.length);
 
       serverResults.forEach((file) => {
-        expect(file.url).toMatch(/~\/_next\/server\/.+\.js\.map$/);
+        expect(file.url).toMatch(/\.next\/server\/.+\.js\.map$/);
         expect(file.filePath).toContain(".next/server");
       });
 

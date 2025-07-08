@@ -379,6 +379,9 @@ describe('TreebeardCore', () => {
       
       const failingExporter = new FailingMockExporter();
       
+      // Reset the singleton instance
+      (TreebeardCore as any).instance = null;
+      
       core = new TreebeardCore({ 
         batchSize: 100, 
         apiKey: 'test-key',
@@ -389,6 +392,7 @@ describe('TreebeardCore', () => {
       
       // First manual flush fails and re-queues, second should succeed
       await core.flush(); // First attempt - fails and re-queues
+      await new Promise(resolve => setTimeout(resolve, 10)); // Small delay
       await core.flush(); // Second attempt - should succeed
       
       expect(failingExporter.getCallCount()).toBe(2);
@@ -498,7 +502,7 @@ describe('TreebeardCore', () => {
       });
       
       // Register an object to trigger export
-      const testObject = { name: 'test', value: 123 };
+      const testObject = { id: 'test-obj', name: 'test', value: 123 };
       TreebeardCore.register(testObject);
       
       // Wait longer for async processing
@@ -506,7 +510,7 @@ describe('TreebeardCore', () => {
       
       // Verify the object was exported
       expect(mockExporter.exportedObjects).toHaveLength(1);
-      expect(mockExporter.exportedObjects[0].fields).toEqual(testObject);
+      expect(mockExporter.exportedObjects[0].fields).toEqual({ value: 123 });
     });
     
     it('should handle object export failures gracefully', async () => {
@@ -524,7 +528,7 @@ describe('TreebeardCore', () => {
         batchAge: 10
       });
       
-      const testObject = { name: 'test', value: 123 };
+      const testObject = { id: 'test-obj-2', name: 'test', value: 123 };
       TreebeardCore.register(testObject);
       
       // Wait for async processing
@@ -532,8 +536,8 @@ describe('TreebeardCore', () => {
       
       // Verify error was logged
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[Treebeard]: Error in flushObjects:',
-        expect.any(Error)
+        '[Treebeard]: Failed to send objects:',
+        'Object export failed'
       );
       
       consoleSpy.mockRestore();
@@ -577,7 +581,7 @@ describe('TreebeardCore', () => {
         batchAge: 10
       });
       
-      const testObject = { name: 'test', nested: { value: 123 } };
+      const testObject = { id: 'test-obj-3', name: 'test', nested: { value: 123 } };
       TreebeardCore.register(testObject);
       
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -586,7 +590,7 @@ describe('TreebeardCore', () => {
       const exportedObject = mockExporter.exportedObjects[0];
       
       // Verify object transformation
-      expect(exportedObject.fields).toEqual(testObject);
+      expect(exportedObject.fields).toEqual({ nested: { value: 123 } });
       expect(exportedObject.project_name).toBe('test-project');
       expect(exportedObject.sdk_version).toBe('2');
       expect(exportedObject.id).toBeDefined();

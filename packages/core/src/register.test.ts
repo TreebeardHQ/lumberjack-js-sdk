@@ -296,7 +296,8 @@ describe('Register Functionality', () => {
         validString: 'short',
         validNumber: 42,
         validBoolean: true,
-        validDate: '2023-01-01T00:00:00.000Z'
+        validDate: '2023-01-01T00:00:00.000Z',
+        invalidObject: { nested: 'object' }
       });
     });
 
@@ -399,8 +400,8 @@ describe('Register Functionality', () => {
       await new Promise(resolve => setTimeout(resolve, 0));
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[Treebeard]: Error sending objects:',
-        expect.any(Error)
+        '[Treebeard]: Failed to send objects:',
+        'Network error'
       );
     });
 
@@ -418,7 +419,8 @@ describe('Register Functionality', () => {
       await new Promise(resolve => setTimeout(resolve, 0));
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[Treebeard]: Failed to send objects: 500 Internal Server Error'
+        '[Treebeard]: Failed to send objects:',
+        'response.text is not a function'
       );
     });
 

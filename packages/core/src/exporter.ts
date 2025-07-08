@@ -1,6 +1,6 @@
-import type { LogEntry } from './types.js';
-import type { RegisteredObject } from './object-batch.js';
-import type { IExportTraceServiceRequest } from '@opentelemetry/otlp-transformer/build/src/trace/internal-types';
+import type { RegisteredObject } from "./object-batch.js";
+import type { EnrichedSpanRequest } from "./span-types.js";
+import type { LogEntry } from "./types.js";
 
 export interface ExportResult {
   success: boolean;
@@ -13,6 +13,7 @@ export interface ExporterConfig {
   endpoint?: string;
   projectName?: string;
   headers?: Record<string, string>;
+  debug?: boolean;
 }
 
 export interface EnrichedLogEntry extends LogEntry {
@@ -38,11 +39,8 @@ export interface EnrichedRegisteredObject extends RegisteredObject {
   commit_sha?: string | undefined;
 }
 
-export interface EnrichedSpanRequest extends IExportTraceServiceRequest {
-  project_name: string;
-  sdk_version: string;
-  commit_sha?: string | undefined;
-}
+// Export the EnrichedSpanRequest type from span-types
+export type { EnrichedSpanRequest } from "./span-types.js";
 
 export interface Exporter {
   exportLogs(logs: EnrichedLogEntry[]): Promise<ExportResult>;

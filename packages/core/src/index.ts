@@ -1,10 +1,22 @@
 export { TreebeardContext } from "./context.js";
 export { TreebeardCore } from "./core.js";
 export type { RegisteredObject } from "./object-batch.js";
-export type { Exporter, ExporterConfig, ExportResult, EnrichedLogEntry, EnrichedRegisteredObject, EnrichedSpanRequest } from "./exporter.js";
+export type { Exporter, ExporterConfig, ExportResult, EnrichedLogEntry, EnrichedRegisteredObject } from "./exporter.js";
 export { HttpExporter } from "./http-exporter.js";
-export type { InternalSpan } from "./span-batch.js";
-export { SpanBatch } from "./span-batch.js";
+export { TreebeardSpanProcessor } from "./span-processor.js";
+export type { 
+  SpanAttributes, 
+  SpanEvent, 
+  SpanLink, 
+  SpanStatus, 
+  OTLPSpan, 
+  InstrumentationScope, 
+  ScopeSpans, 
+  Resource, 
+  ResourceSpans, 
+  SpanExportRequest,
+  EnrichedSpanRequest
+} from "./span-types.js";
 
 export { detectRuntime, getEnvironmentValue } from "./runtime.js";
 export type { RuntimeEnvironment } from "./runtime.js";
@@ -85,51 +97,6 @@ export const register = (obj?: any) => {
   TreebeardCore.register(obj);
 };
 
-export const span = {
-  start: (name: string, options?: {
-    traceId?: string;
-    parentSpanId?: string;
-    kind?: number;
-    attributes?: Record<string, string | number | boolean>;
-    serviceName?: string;
-  }) => {
-    const instance = TreebeardCore.getInstance();
-    if (instance) {
-      return instance.startSpan(name, options || {});
-    }
-    return '';
-  },
-  finish: (spanId: string, options?: {
-    status?: { code: number; message?: string };
-    attributes?: Record<string, string | number | boolean>;
-    events?: Array<{
-      name: string;
-      attributes?: Record<string, string | number | boolean>;
-    }>;
-  }) => {
-    const instance = TreebeardCore.getInstance();
-    if (instance) {
-      instance.finishSpan(spanId, options || {});
-    }
-  },
-  withSpan: async <T>(
-    name: string, 
-    fn: (spanId: string) => T | Promise<T>,
-    options?: {
-      traceId?: string;
-      parentSpanId?: string;
-      kind?: number;
-      attributes?: Record<string, string | number | boolean>;
-      serviceName?: string;
-    }
-  ): Promise<T> => {
-    const instance = TreebeardCore.getInstance();
-    if (!instance) {
-      throw new Error("[Treebeard] SDK not initialized. Call Treebeard.init() first.");
-    }
-    return instance.withSpan(name, fn, options || {});
-  }
-};
 
 // Export a convenient namespace for the API
 export const Treebeard = {
@@ -140,10 +107,5 @@ export const Treebeard = {
       throw new Error("[Treebeard] SDK not initialized. Call Treebeard.init() first.");
     }
     return instance.gatekeeper.gatekeeper(key);
-  },
-  span: {
-    start: span.start,
-    finish: span.finish,
-    withSpan: span.withSpan
   }
 };
