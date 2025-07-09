@@ -1,24 +1,49 @@
+import { trace } from "@opentelemetry/api";
+import * as Resources from "@opentelemetry/resources";
+import { NodeSDK } from "@opentelemetry/sdk-node";
+import { ReadableSpan } from "@opentelemetry/sdk-trace-node";
+import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import { EventEmitter } from "events";
 import { TreebeardContext } from "./context.js";
-import { detectRuntime, getEnvironmentValue } from "./runtime.js";
 import { getCommitSha, getEnvironmentInfo } from "./environment.js";
-import { LogEntry, LogLevelType, TraceContext, TreebeardConfig } from "./types.js";
-import { getCallerInfo } from "./util/get-caller-info.js";
-import { ObjectBatch, RegisteredObject } from "./object-batch.js";
+import type {
+  EnrichedLogEntry,
+  EnrichedRegisteredObject,
+  Exporter,
+} from "./exporter.js";
 import { Gatekeeper } from "./gatekeeper.js";
-import type { Exporter, EnrichedLogEntry, EnrichedRegisteredObject } from "./exporter.js";
 import { HttpExporter } from "./http-exporter.js";
+import { ObjectBatch, RegisteredObject } from "./object-batch.js";
+import { detectRuntime, getEnvironmentValue } from "./runtime.js";
+import { convertReadableSpansToOTLP, SpanBatch } from "./span-batch.js";
+import { TreebeardSpanProcessor } from "./span-processor.js";
+import {
+  LogEntry,
+  LogLevelType,
+  TraceContext,
+  TreebeardConfig,
+} from "./types.js";
+import { getCallerInfo } from "./util/get-caller-info.js";
 
 export class TreebeardCore extends EventEmitter {
   private static instance: TreebeardCore | null = null;
 
-  private config!: Required<Omit<TreebeardConfig, 'exporter'>> & { exporter?: Exporter | undefined };
+  private config!: Required<Omit<TreebeardConfig, "exporter">> & {
+    exporter?: Exporter | undefined;
+  };
   private logBuffer: LogEntry[] = [];
   private objectBatch: ObjectBatch | null = null;
+  private spanBatch: SpanBatch | null = null;
   private flushTimer: NodeJS.Timeout | null = null;
   private originalConsoleMethods: Record<string, Function> = {};
   private isShuttingDown = false;
-  private injectionCallbacks: Map<string, () => { traceContext?: Partial<TraceContext>; metadata?: Record<string, any> }> = new Map();
+  private injectionCallbacks: Map<
+    string,
+    () => {
+      traceContext?: Partial<TraceContext>;
+      metadata?: Record<string, any>;
+    }
+  > = new Map();
   private objectCache: Map<string, string> = new Map();
   private _gatekeeper: Gatekeeper | null = null;
   private exporter!: Exporter;
@@ -43,8 +68,14 @@ export class TreebeardCore extends EventEmitter {
       captureConsole: config.captureConsole || false,
       captureUnhandled: config.captureUnhandled !== false,
       debug: config.debug || false,
-      serviceToken: config.serviceToken || getEnvironmentValue("TREEBEARD_SERVICE_TOKEN") || "",
-      gatekeeperEndpoint: config.gatekeeperEndpoint || getEnvironmentValue("TREEBEARD_GATEKEEPER_ENDPOINT") || "https://api.treebeardhq.com/gatekeeper",
+      serviceToken:
+        config.serviceToken ||
+        getEnvironmentValue("TREEBEARD_SERVICE_TOKEN") ||
+        "",
+      gatekeeperEndpoint:
+        config.gatekeeperEndpoint ||
+        getEnvironmentValue("TREEBEARD_GATEKEEPER_ENDPOINT") ||
+        "https://api.treebeardhq.com/gatekeeper",
       exporter: config.exporter || undefined,
     };
 
@@ -58,14 +89,21 @@ export class TreebeardCore extends EventEmitter {
     }
 
     // Initialize exporter - use provided exporter or create default HttpExporter
-    this.exporter = config.exporter || new HttpExporter({
-      apiKey: this.config.apiKey,
-      endpoint: this.config.endpoint,
-      projectName: this.config.projectName
-    });
+    this.exporter =
+      config.exporter ||
+      new HttpExporter({
+        apiKey: this.config.apiKey,
+        endpoint: this.config.endpoint,
+        projectName: this.config.projectName,
+      });
 
-    this.objectBatch = new ObjectBatch(this.config.batchSize, this.config.batchAge);
-    
+    this.objectBatch = new ObjectBatch(
+      this.config.batchSize,
+      this.config.batchAge
+    );
+
+    this.spanBatch = new SpanBatch(this.config.batchSize, this.config.batchAge);
+
     this.startFlushTimer();
 
     if (this.config.captureConsole) {
@@ -73,6 +111,19 @@ export class TreebeardCore extends EventEmitter {
     }
 
     TreebeardCore.instance = this;
+
+    // set up and start the sdk
+    const sdk = new NodeSDK({
+      resource: Resources.resourceFromAttributes({
+        [ATTR_SERVICE_NAME]: this.config.projectName,
+      }),
+      spanProcessor: new TreebeardSpanProcessor({
+        debug: this.config.debug,
+        instance: this,
+      }),
+    });
+
+    sdk.start();
   }
 
   static init(config?: TreebeardConfig): TreebeardCore {
@@ -83,8 +134,23 @@ export class TreebeardCore extends EventEmitter {
     return TreebeardCore.instance;
   }
 
-  registerInjection(callback: () => { traceContext?: Partial<TraceContext>; metadata?: Record<string, any> }): string {
-    const id = `injection_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  addSpan(span: ReadableSpan): void {
+    if (this.spanBatch) {
+      if (this.spanBatch.add(span)) {
+        this.flushSpans();
+      }
+    }
+  }
+
+  registerInjection(
+    callback: () => {
+      traceContext?: Partial<TraceContext>;
+      metadata?: Record<string, any>;
+    }
+  ): string {
+    const id = `injection_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
     this.injectionCallbacks.set(id, callback);
     return id;
   }
@@ -152,11 +218,17 @@ export class TreebeardCore extends EventEmitter {
         // to get the actual application code that called console.log/error/etc
         const caller = getCallerInfo(1); // Skip the console wrapper to get actual caller
 
-        this.log(logLevel, message, {
-          source: "console",
-          attributes,
-          exception: Object.keys(errorInfo).length > 0 ? errorInfo : undefined,
-        }, caller);
+        this.log(
+          logLevel,
+          message,
+          {
+            source: "console",
+            attributes,
+            exception:
+              Object.keys(errorInfo).length > 0 ? errorInfo : undefined,
+          },
+          caller
+        );
       };
     });
   }
@@ -183,41 +255,29 @@ export class TreebeardCore extends EventEmitter {
     const context = TreebeardContext.getStore();
     const callerInfo = caller || getCallerInfo(3); // fallback with deeper skip
 
-    // Collect data from all injection callbacks
-    let injectedTraceContext: Partial<TraceContext> = {};
-    let injectedMetadata: Record<string, any> = {};
-
-    for (const callback of this.injectionCallbacks.values()) {
-      try {
-        const result = callback();
-        if (result.traceContext) {
-          injectedTraceContext = { ...injectedTraceContext, ...result.traceContext };
+    const currentSpan = trace.getActiveSpan();
+    const traceContext = currentSpan
+      ? {
+          traceId: currentSpan.spanContext().traceId,
+          spanId: currentSpan.spanContext().spanId,
         }
-        if (result.metadata) {
-          injectedMetadata = { ...injectedMetadata, ...result.metadata };
-        }
-      } catch (error) {
-        if (this.config.debug) {
-          console.warn("[Treebeard] Injection callback failed:", error);
-        }
-      }
-    }
+      : {};
 
     const logEntry: LogEntry = {
       message,
       level,
 
       timestamp: Date.now(),
-      traceId: metadata.traceId || injectedTraceContext.traceId || context?.traceId,
-      ...((metadata.spanId || injectedTraceContext.spanId || context?.spanId) && {
-        spanId: metadata.spanId || injectedTraceContext.spanId || context?.spanId,
-      }),
+      traceId:
+        metadata.traceId ||
+        traceContext.traceId ||
+        context?.traceId ||
+        undefined,
+      spanId: traceContext.spanId || context?.spanId || undefined,
       source: metadata.source || "treebeard-js",
       ...callerInfo,
       props: {
-        ...injectedMetadata,
         ...metadata,
-        tn: metadata.traceName || injectedTraceContext.traceName || context?.traceName,
       },
       exception: metadata.exception,
     };
@@ -306,7 +366,7 @@ export class TreebeardCore extends EventEmitter {
         if (formattedObj) {
           // Always attach to context regardless of cache status
           this.attachToContext(formattedObj);
-          
+
           // Check cache before adding to batch
           if (this.shouldRegisterObject(formattedObj)) {
             if (this.objectBatch?.add(formattedObj)) {
@@ -321,7 +381,7 @@ export class TreebeardCore extends EventEmitter {
       if (formattedObj) {
         // Always attach to context regardless of cache status
         this.attachToContext(formattedObj);
-        
+
         // Check cache before adding to batch
         if (this.shouldRegisterObject(formattedObj)) {
           if (this.objectBatch?.add(formattedObj)) {
@@ -340,28 +400,31 @@ export class TreebeardCore extends EventEmitter {
   }
 
   private isPlainRecord(obj: any): boolean {
-    if (!obj || typeof obj !== 'object') return false;
+    if (!obj || typeof obj !== "object") return false;
     if (Array.isArray(obj)) return false;
-    
+
     // If it has an 'id' field, treat it as a single object to register
     if (obj.id !== undefined) return false;
-    
+
     // Check if it's a plain Object literal (constructor is Object)
     // This handles cases like { user: userObject, product: productObject }
     if (obj.constructor === Object) return true;
-    
+
     // Don't treat class instances as records
     return false;
   }
 
-  private formatObject(objData: any, forcedName?: string): RegisteredObject | null {
+  private formatObject(
+    objData: any,
+    forcedName?: string
+  ): RegisteredObject | null {
     if (!objData) return null;
 
     let objDict: Record<string, any>;
     let className: string | null = null;
 
     // Convert object to dict if needed
-    if (typeof objData !== 'object' || objData === null) {
+    if (typeof objData !== "object" || objData === null) {
       if (this.config.debug) {
         console.warn("[Treebeard] Cannot register non-object data");
       }
@@ -376,7 +439,7 @@ export class TreebeardCore extends EventEmitter {
     }
 
     // Get class name if it's a class instance
-    if (objData.constructor && objData.constructor.name !== 'Object') {
+    if (objData.constructor && objData.constructor.name !== "Object") {
       className = objData.constructor.name;
     }
 
@@ -386,7 +449,9 @@ export class TreebeardCore extends EventEmitter {
     // Check for ID field and warn if missing
     if (!objDict.id) {
       if (this.config.debug) {
-        console.warn("[Treebeard] Object registered without 'id' field. This may cause issues with object tracking.");
+        console.warn(
+          "[Treebeard] Object registered without 'id' field. This may cause issues with object tracking."
+        );
       }
       return null;
     }
@@ -402,7 +467,7 @@ export class TreebeardCore extends EventEmitter {
     // Validate and filter fields
     const fields: Record<string, any> = {};
     for (const [key, value] of Object.entries(objDict)) {
-      if (key === 'name' || key === 'id') {
+      if (key === "name" || key === "id") {
         continue;
       }
 
@@ -415,18 +480,18 @@ export class TreebeardCore extends EventEmitter {
     return {
       name,
       id: objId,
-      fields
+      fields,
     };
   }
 
   private formatField(_key: string, value: any): any {
     // Check for numbers
-    if (typeof value === 'number') {
+    if (typeof value === "number") {
       return value;
     }
 
     // Check for booleans
-    if (typeof value === 'boolean') {
+    if (typeof value === "boolean") {
       return value;
     }
 
@@ -436,11 +501,11 @@ export class TreebeardCore extends EventEmitter {
     }
 
     // Check for searchable strings (under 1024 chars)
-    if (typeof value === 'string') {
+    if (typeof value === "string") {
       if (value.length <= 1024) {
         // Simple heuristic: if it looks like metadata (short, no newlines)
         // rather than body text
-        const valid = !value.includes('\n') && !value.includes('\r');
+        const valid = !value.includes("\n") && !value.includes("\r");
         if (valid) {
           return value;
         }
@@ -448,7 +513,12 @@ export class TreebeardCore extends EventEmitter {
     }
 
     // Check for plain objects (allow nested objects)
-    if (value && typeof value === 'object' && !Array.isArray(value) && value.constructor === Object) {
+    if (
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      value.constructor === Object
+    ) {
       return value;
     }
 
@@ -458,24 +528,33 @@ export class TreebeardCore extends EventEmitter {
   private shouldRegisterObject(formattedObj: RegisteredObject): boolean {
     const objId = formattedObj.id;
     const checksum = this.calculateObjectChecksum(formattedObj);
-    
+
     // Check if we've seen this object with this exact data before
     const cachedChecksum = this.objectCache.get(objId);
-    
+
     if (cachedChecksum === checksum) {
       if (this.config.debug) {
-        console.log(`[Treebeard] Object ${objId} unchanged (checksum: ${checksum.substring(0, 8)}...), skipping registration`);
+        console.log(
+          `[Treebeard] Object ${objId} unchanged (checksum: ${checksum.substring(
+            0,
+            8
+          )}...), skipping registration`
+        );
       }
       return false;
     }
-    
+
     // Object is new or changed, update cache
     this.objectCache.set(objId, checksum);
-    
+
     if (this.config.debug) {
-      console.log(`[Treebeard] Object ${objId} ${cachedChecksum ? 'changed' : 'new'} (checksum: ${checksum.substring(0, 8)}...), will register`);
+      console.log(
+        `[Treebeard] Object ${objId} ${
+          cachedChecksum ? "changed" : "new"
+        } (checksum: ${checksum.substring(0, 8)}...), will register`
+      );
     }
-    
+
     return true;
   }
 
@@ -484,27 +563,27 @@ export class TreebeardCore extends EventEmitter {
     const dataToHash = {
       name: formattedObj.name,
       id: formattedObj.id,
-      fields: formattedObj.fields
+      fields: formattedObj.fields,
     };
-    
+
     // Sort fields to ensure consistent ordering
     const sortedFields: Record<string, any> = {};
     Object.keys(dataToHash.fields || {})
       .sort()
-      .forEach(key => {
+      .forEach((key) => {
         sortedFields[key] = dataToHash.fields[key];
       });
-    
+
     const normalizedData = {
       ...dataToHash,
-      fields: sortedFields
+      fields: sortedFields,
     };
-    
+
     // Simple hash function (djb2 algorithm)
     const str = JSON.stringify(normalizedData);
     let hash = 5381;
     for (let i = 0; i < str.length; i++) {
-      hash = ((hash << 5) + hash) + str.charCodeAt(i);
+      hash = (hash << 5) + hash + str.charCodeAt(i);
     }
     return Math.abs(hash).toString(16);
   }
@@ -527,8 +606,47 @@ export class TreebeardCore extends EventEmitter {
       }
 
       if (this.config.debug) {
-        console.log(`[Treebeard] Attached object to context: ${contextKey} = ${objectId}`);
+        console.log(
+          `[Treebeard] Attached object to context: ${contextKey} = ${objectId}`
+        );
       }
+    }
+  }
+
+  flushSpans(): number {
+    if (!this.spanBatch) {
+      if (this.config.debug) {
+        console.log("[Treebeard] Span batch not initialized");
+      }
+      return 0;
+    }
+
+    const spans = this.spanBatch.getSpans();
+    const count = spans.length;
+    if (spans.length > 0) {
+      this.sendSpans(spans).catch((error) => {
+        console.error("[Treebeard]: Error in flushSpans:", error);
+      });
+    }
+
+    return count;
+  }
+
+  private async sendSpans(spans: ReadableSpan[]): Promise<void> {
+    const transformedSpans = convertReadableSpansToOTLP(spans);
+
+    const result = await this.exporter.exportSpans({
+      resourceSpans: transformedSpans.resourceSpans,
+      project_name: this.config.projectName,
+      sdk_version: "2",
+      commit_sha: getCommitSha(),
+    });
+
+    if (!result.success) {
+      console.error(
+        "[Treebeard]: Failed to send spans:",
+        result.error?.message
+      );
     }
   }
 
@@ -544,7 +662,7 @@ export class TreebeardCore extends EventEmitter {
     const count = objects.length;
     if (objects.length > 0) {
       // Fire and forget - don't await to maintain non-blocking behavior
-      this.sendObjects(objects).catch(error => {
+      this.sendObjects(objects).catch((error) => {
         console.error("[Treebeard]: Error in flushObjects:", error);
       });
     }
@@ -560,12 +678,14 @@ export class TreebeardCore extends EventEmitter {
     const commitSha = getCommitSha();
 
     // Transform objects to include metadata
-    const transformedObjects: EnrichedRegisteredObject[] = objects.map(obj => ({
-      ...obj,
-      project_name: this.config.projectName,
-      sdk_version: "2",
-      commit_sha: commitSha,
-    }));
+    const transformedObjects: EnrichedRegisteredObject[] = objects.map(
+      (obj) => ({
+        ...obj,
+        project_name: this.config.projectName,
+        sdk_version: "2",
+        commit_sha: commitSha,
+      })
+    );
 
     if (this.config.debug) {
       console.log(`[Treebeard] Sending ${objects.length} objects`);
@@ -574,12 +694,20 @@ export class TreebeardCore extends EventEmitter {
     const result = await this.exporter.exportObjects(transformedObjects);
 
     if (!result.success) {
-      console.error("[Treebeard]: Failed to send objects:", result.error?.message);
+      console.error(
+        "[Treebeard]: Failed to send objects:",
+        result.error?.message
+      );
     } else if (this.config.debug) {
-      console.log(`[Treebeard] Successfully sent ${result.itemsExported} objects`);
+      console.log(
+        `[Treebeard] Successfully sent ${result.itemsExported} objects`
+      );
     }
   }
 
+  public getExporter(): Exporter {
+    return this.exporter;
+  }
 
   private startFlushTimer(): void {
     const runtime = detectRuntime();
@@ -610,6 +738,12 @@ export class TreebeardCore extends EventEmitter {
         );
       }
     }
+  }
+
+  async flushAll(): Promise<void> {
+    await this.flush();
+    await this.flushObjects();
+    await this.flushSpans();
   }
 
   async flush(): Promise<void> {
@@ -664,58 +798,9 @@ export class TreebeardCore extends EventEmitter {
     }
   }
 
-  startTrace(
-    traceId: string,
-    spanId: string,
-    traceName: string,
-    metadata: Record<string, any>
-  ): void {
-    const caller = getCallerInfo(1); // Skip this method to get the actual caller
-    this.log("info", "Beginning {traceName}", {
-      ...metadata,
-      traceId,
-      spanId,
-      traceName,
-      tb_i_tags: {
-        tb_trace_start: true,
-      },
-    }, caller);
-  }
-
-
-
-
-  completeTrace(
-    traceId: string,
-    spanId?: string,
-    success: boolean = true,
-    metadata: Record<string, any> = {}
-  ): void {
-    const message = success
-      ? "Request completed successfully"
-      : "Request failed";
-    const level = success ? "info" : "error";
-
-    const tb_i_tags: Record<string, any> = {};
-
-    if (success) {
-      tb_i_tags.tb_trace_complete_success = true;
-    } else {
-      tb_i_tags.tb_trace_complete_error = false;
-    }
-
-    const caller = getCallerInfo(1); // Skip this method to get the actual caller
-    this.log(level, message, {
-      ...metadata,
-      traceId,
-      ...(spanId && { spanId }),
-
-      success,
-      tb_i_tags,
-    }, caller);
-  }
-
-  getConfig(): Required<Omit<TreebeardConfig, 'exporter'>> & { exporter?: Exporter | undefined } {
+  getConfig(): Required<Omit<TreebeardConfig, "exporter">> & {
+    exporter?: Exporter | undefined;
+  } {
     return this.config;
   }
 
@@ -741,8 +826,7 @@ export class TreebeardCore extends EventEmitter {
     this.disableConsoleCapture();
     await this.flush();
     this.flushObjects();
-    
-    
+
     // Clear object cache
     this.objectCache.clear();
 

@@ -19,12 +19,12 @@ export interface LogEntry {
   message: string;
   level: LogLevelType;
   timestamp: number;
-  traceId?: string;
-  spanId?: string;
+  traceId?: string | undefined;
+  spanId?: string | undefined;
   source?: string;
-  file?: string;
-  line?: number;
-  function?: string;
+  file?: string | undefined;
+  line?: number | undefined;
+  function?: string | undefined;
   exception?: {
     name: string;
     message: string;
@@ -48,7 +48,7 @@ export interface LogEntryForAPI {
   fn?: string | undefined;
 }
 
-import type { Exporter } from './exporter.js';
+import type { Exporter } from "./exporter.js";
 
 export interface TreebeardConfig {
   apiKey?: string;

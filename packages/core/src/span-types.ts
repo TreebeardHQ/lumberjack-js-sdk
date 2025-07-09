@@ -3,9 +3,25 @@
  * These match the OTLP JSON schema but avoid dependencies on internal OpenTelemetry types
  */
 
-export interface SpanAttributes {
-  [key: string]: string | number | boolean;
-}
+type KeyValue = {
+  key: string;
+  value: AnyValue;
+};
+
+/**
+ * AnyValue type for OTLP span attributes.
+ * This matches the OTLP JSON schema for AnyValue.
+ */
+export type AnyValue =
+  | { stringValue: string }
+  | { boolValue: boolean }
+  | { intValue: number }
+  | { doubleValue: number }
+  | { arrayValue: AnyValue[] }
+  | { kvlistValue: KeyValue[] }
+  | { bytesValue: string };
+
+export type SpanAttributes = KeyValue[];
 
 export interface SpanEvent {
   timeUnixNano: number;
@@ -21,7 +37,7 @@ export interface SpanLink {
 
 export interface SpanStatus {
   code: number; // 0=Unset, 1=Ok, 2=Error
-  message?: string;
+  message?: string | undefined;
 }
 
 export interface OTLPSpan {
@@ -78,18 +94,24 @@ export interface InternalSpan {
   startTimeNano: number;
   endTimeNano: number;
   attributes?: SpanAttributes | undefined;
-  events?: Array<{
-    timeNano: number;
-    name: string;
-    attributes?: SpanAttributes | undefined;
-  }> | undefined;
-  status?: {
-    code: number;
-    message?: string;
-  } | undefined;
+  events?:
+    | Array<{
+        timeNano: number;
+        name: string;
+        attributes?: SpanAttributes | undefined;
+      }>
+    | undefined;
+  status?:
+    | {
+        code: number;
+        message?: string;
+      }
+    | undefined;
   serviceName?: string | undefined;
-  instrumentationScope?: {
-    name?: string;
-    version?: string;
-  } | undefined;
+  instrumentationScope?:
+    | {
+        name?: string;
+        version?: string;
+      }
+    | undefined;
 }
