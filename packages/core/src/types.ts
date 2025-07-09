@@ -43,6 +43,7 @@ export interface LogEntryForAPI {
   src?: string | undefined;
   props?: Record<string, any> | undefined;
   tid?: string | undefined;
+  sid?: string | undefined;
   exv?: string | undefined;
   ext?: string | undefined;
   fn?: string | undefined;

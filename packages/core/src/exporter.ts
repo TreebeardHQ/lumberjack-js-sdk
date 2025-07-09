@@ -25,6 +25,7 @@ export interface EnrichedLogEntry extends LogEntry {
   tb?: string | undefined;
   src?: string | undefined;
   tid?: string | undefined;
+  sid?: string | undefined;
   exv?: string | undefined;
   ext?: string | undefined;
   fn?: string | undefined;

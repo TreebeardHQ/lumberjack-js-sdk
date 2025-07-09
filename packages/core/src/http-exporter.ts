@@ -58,6 +58,7 @@ export class HttpExporter implements Exporter {
         src: log.src,
         props: log.props,
         tid: log.tid,
+        sid: log.sid,
         exv: log.exv,
         ext: log.ext,
         fn: log.fn,

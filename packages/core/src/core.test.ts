@@ -182,54 +182,6 @@ describe("TreebeardCore", () => {
     });
   });
 
-  describe("Injection Callbacks", () => {
-    beforeEach(() => {
-      core = new TreebeardCore({ batchSize: 1, apiKey: "test-key" });
-    });
-
-    it("should register and use injection callbacks", () => {
-      const callback = jest.fn<() => any>().mockReturnValue({
-        traceContext: { traceId: "injected-trace" },
-        metadata: { injected: "data" },
-      });
-
-      const id = core.registerInjection(callback);
-      expect(typeof id).toBe("string");
-
-      core.info("test message");
-
-      expect(callback).toHaveBeenCalled();
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          body: expect.stringContaining('"tid":"injected-trace"'),
-        })
-      );
-    });
-
-    it("should unregister injection callbacks", () => {
-      const callback = jest.fn<() => any>().mockReturnValue({});
-
-      const id = core.registerInjection(callback);
-      const removed = core.unregisterInjection(id);
-
-      expect(removed).toBe(true);
-
-      core.info("test message");
-      expect(callback).not.toHaveBeenCalled();
-    });
-
-    it("should handle injection callback errors gracefully", () => {
-      const callback = jest.fn<() => any>().mockImplementation(() => {
-        throw new Error("Injection error");
-      });
-
-      core.registerInjection(callback);
-
-      expect(() => core.info("test message")).not.toThrow();
-    });
-  });
-
   describe("Console Capture", () => {
     beforeEach(() => {
       core = new TreebeardCore({

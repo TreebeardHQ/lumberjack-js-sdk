@@ -1,6 +1,6 @@
 {
   "name": "@treebeardhq/nextjs",
-  "version": "0.3.1-4",
+  "version": "0.3.1-5",
   "description": "Next.js integration for Treebeard logging and tracing",
   "type": "module",
   "main": "dist/index.js",

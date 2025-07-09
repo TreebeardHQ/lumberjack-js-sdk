@@ -17,12 +17,7 @@ import { ObjectBatch, RegisteredObject } from "./object-batch.js";
 import { detectRuntime, getEnvironmentValue } from "./runtime.js";
 import { convertReadableSpansToOTLP, SpanBatch } from "./span-batch.js";
 import { TreebeardSpanProcessor } from "./span-processor.js";
-import {
-  LogEntry,
-  LogLevelType,
-  TraceContext,
-  TreebeardConfig,
-} from "./types.js";
+import { LogEntry, LogLevelType, TreebeardConfig } from "./types.js";
 import { getCallerInfo } from "./util/get-caller-info.js";
 
 export class TreebeardCore extends EventEmitter {
@@ -37,13 +32,7 @@ export class TreebeardCore extends EventEmitter {
   private flushTimer: NodeJS.Timeout | null = null;
   private originalConsoleMethods: Record<string, Function> = {};
   private isShuttingDown = false;
-  private injectionCallbacks: Map<
-    string,
-    () => {
-      traceContext?: Partial<TraceContext>;
-      metadata?: Record<string, any>;
-    }
-  > = new Map();
+
   private objectCache: Map<string, string> = new Map();
   private _gatekeeper: Gatekeeper | null = null;
   private exporter!: Exporter;
@@ -140,23 +129,6 @@ export class TreebeardCore extends EventEmitter {
         this.flushSpans();
       }
     }
-  }
-
-  registerInjection(
-    callback: () => {
-      traceContext?: Partial<TraceContext>;
-      metadata?: Record<string, any>;
-    }
-  ): string {
-    const id = `injection_${Date.now()}_${Math.random()
-      .toString(36)
-      .substr(2, 9)}`;
-    this.injectionCallbacks.set(id, callback);
-    return id;
-  }
-
-  unregisterInjection(id: string): boolean {
-    return this.injectionCallbacks.delete(id);
   }
 
   private enableConsoleCapture(): void {
@@ -775,6 +747,7 @@ export class TreebeardCore extends EventEmitter {
       tb: log.exception?.stack,
       src: log.source,
       tid: log.traceId,
+      sid: log.spanId,
       exv: log.exception?.message,
       ext: log.exception?.name,
       fn: log.function,
