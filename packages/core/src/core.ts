@@ -333,7 +333,7 @@ export class LumberjackCore extends EventEmitter {
     }
 
     // Check if obj is a record (plain object) where keys should be used as names
-    if (this.isPlainRecord(obj)) {
+    if (LumberjackCore.isPlainRecord(obj)) {
       // Handle record registration - register each key-value pair
       for (const [key, value] of Object.entries(obj)) {
         const formattedObj = this.formatObject(value, key);
@@ -370,13 +370,21 @@ export class LumberjackCore extends EventEmitter {
   }
 
   static register(obj?: any): void {
+    // TODO
     const instance = LumberjackCore.getInstance();
     if (instance) {
       instance.registerObject(obj);
+    } else {
+      const currentSpan = trace.getActiveSpan();
+
+      console.warn(
+        "[Lumberjack] No instance found, skipping registration, current span",
+        currentSpan
+      );
     }
   }
 
-  private isPlainRecord(obj: any): boolean {
+  private static isPlainRecord(obj: any): boolean {
     if (!obj || typeof obj !== "object") return false;
     if (Array.isArray(obj)) return false;
 
