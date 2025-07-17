@@ -6,10 +6,10 @@ import {
   it,
   jest,
 } from "@jest/globals";
-import { MockExporter } from "./__mocks__/mock-exporter";
-import { LumberjackContext } from "./context";
-import { LumberjackCore } from "./core";
-import type { EnrichedLogEntry, ExportResult } from "./exporter";
+import { MockExporter } from "./__mocks__/mock-exporter.js";
+import { LumberjackContext } from "./context.js";
+import { LumberjackCore } from "./core.js";
+import type { EnrichedLogEntry, ExportResult } from "./exporter.js";
 
 describe("LumberjackCore", () => {
   let core: LumberjackCore;

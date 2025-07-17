@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
-import { detectRuntime, getEnvironmentValue } from "./runtime";
+import { detectRuntime, getEnvironmentValue } from "./runtime.js";
 
 describe("Runtime Detection", () => {
   // Store original values for restoration

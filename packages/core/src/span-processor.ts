@@ -1,6 +1,6 @@
 import { Context } from "@opentelemetry/api";
 import { ReadableSpan, SpanProcessor } from "@opentelemetry/sdk-trace-node";
-import { LumberjackCore } from "./core";
+import { LumberjackCore } from "./core.js";
 
 /**
  * Custom OpenTelemetry SpanProcessor that captures all spans and exports them

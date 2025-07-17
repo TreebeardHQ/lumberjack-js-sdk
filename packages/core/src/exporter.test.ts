@@ -1,5 +1,5 @@
-import { MockExporter } from "./__mocks__/mock-exporter";
-import type { EnrichedLogEntry, EnrichedRegisteredObject } from "./exporter";
+import { MockExporter } from "./__mocks__/mock-exporter.js";
+import type { EnrichedLogEntry, EnrichedRegisteredObject } from "./exporter.js";
 
 describe("Exporter Interface", () => {
   let mockExporter: MockExporter;

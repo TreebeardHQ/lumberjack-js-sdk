@@ -4,7 +4,7 @@ import {
   OTLPSpan,
   ResourceSpans,
   SpanAttributes,
-} from "./span-types";
+} from "./span-types.js";
 
 /**
  * Convert OpenTelemetry ReadableSpan to our OTLP format
@@ -39,7 +39,7 @@ export function convertReadableSpansToOTLP(
       {
         scope: {
           name: spans[0]?.instrumentationScope?.name || "@lumberjack-sdk/core",
-          version: spans[0]?.instrumentationScope?.version || "1.0.0",
+          version: spans[0]?.instrumentationScope?.version || "0.5.0",
         },
         spans: spans.map((span) => {
           // Convert OpenTelemetry attributes to simple key-value pairs

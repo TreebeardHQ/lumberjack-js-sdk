@@ -4,7 +4,7 @@ import type {
   EnrichedSpanRequest,
   Exporter,
   ExportResult,
-} from "../exporter";
+} from "../exporter.js";
 
 export class MockExporter implements Exporter {
   public exportedLogs: EnrichedLogEntry[] = [];

@@ -5,8 +5,8 @@ import type {
   Exporter,
   ExporterConfig,
   ExportResult,
-} from "./exporter";
-import type { LogEntryForAPI } from "./types";
+} from "./exporter.js";
+import type { LogEntryForAPI } from "./types.js";
 
 export class HttpExporter implements Exporter {
   private readonly config: ExporterConfig;

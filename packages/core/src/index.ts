@@ -1,15 +1,15 @@
-export { LumberjackContext } from "./context";
-export { LumberjackCore } from "./core";
+export { LumberjackContext } from "./context.js";
+export { LumberjackCore } from "./core.js";
 export type {
   EnrichedLogEntry,
   EnrichedRegisteredObject,
   Exporter,
   ExporterConfig,
   ExportResult,
-} from "./exporter";
-export { HttpExporter } from "./http-exporter";
-export type { RegisteredObject } from "./object-batch";
-export { LumberjackSpanProcessor } from "./span-processor";
+} from "./exporter.js";
+export { HttpExporter } from "./http-exporter.js";
+export type { RegisteredObject } from "./object-batch.js";
+export { LumberjackSpanProcessor } from "./span-processor.js";
 export type {
   EnrichedSpanRequest,
   InstrumentationScope,
@@ -22,7 +22,7 @@ export type {
   SpanExportRequest,
   SpanLink,
   SpanStatus,
-} from "./span-types";
+} from "./span-types.js";
 
 export {
   getBranch,
@@ -37,10 +37,10 @@ export {
   isCI,
   isDevelopment,
   isProduction,
-} from "./environment";
-export type { EnvironmentInfo } from "./environment";
-export { detectRuntime, getEnvironmentValue } from "./runtime";
-export type { RuntimeEnvironment } from "./runtime";
+} from "./environment.js";
+export type { EnvironmentInfo } from "./environment.js";
+export { detectRuntime, getEnvironmentValue } from "./runtime.js";
+export type { RuntimeEnvironment } from "./runtime.js";
 export type {
   GatekeeperResponse,
   GatekeeperResult,
@@ -49,10 +49,10 @@ export type {
   LogLevelType,
   LumberjackConfig,
   TraceContext,
-} from "./types";
+} from "./types.js";
 
-import { LumberjackCore } from "./core";
-import { getCallerInfo } from "./util/get-caller-info";
+import { LumberjackCore } from "./core.js";
+import { getCallerInfo } from "./util/get-caller-info.js";
 
 export const log = {
   trace: (message: string, metadata?: Record<string, any>) => {

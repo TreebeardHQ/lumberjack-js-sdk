@@ -379,7 +379,7 @@ export function withLumberjackConfig(
 
   // Add commit SHA to environment if available
   if (commitSha) {
-    env[commitEnvVar] = commitSha;
+    env["LUMBERJACK_COMMIT_SHA"] = commitSha;
     console.log(
       `[Lumberjack] Injected ${commitEnvVar}=${commitSha} into environment`
     );

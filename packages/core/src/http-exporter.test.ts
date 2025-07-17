@@ -1,5 +1,5 @@
-import type { EnrichedLogEntry, EnrichedRegisteredObject } from "./exporter";
-import { HttpExporter } from "./http-exporter";
+import type { EnrichedLogEntry, EnrichedRegisteredObject } from "./exporter.js";
+import { HttpExporter } from "./http-exporter.js";
 
 // Mock fetch globally
 const mockFetch = jest.fn();

@@ -1,4 +1,4 @@
-import type { Exporter } from "./exporter";
+import type { Exporter } from "./exporter.js";
 
 export interface LogLevel {
   TRACE: "trace";

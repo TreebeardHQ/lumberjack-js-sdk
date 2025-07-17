@@ -6,7 +6,7 @@ import {
   it,
   jest,
 } from "@jest/globals";
-import { log, LumberjackCore } from "./index";
+import { log, LumberjackCore } from "./index.js";
 
 describe("Exported Log Functions", () => {
   let core: LumberjackCore;

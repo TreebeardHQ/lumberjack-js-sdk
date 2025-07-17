@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "async_hooks";
 import { randomBytes } from "node:crypto";
-import { TraceContext } from "./types";
+import { TraceContext } from "./types.js";
 
 class LumberjackContext {
   private static asyncLocalStorage = new AsyncLocalStorage<TraceContext>();

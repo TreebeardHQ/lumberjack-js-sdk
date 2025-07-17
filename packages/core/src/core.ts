@@ -4,21 +4,21 @@ import { NodeSDK } from "@opentelemetry/sdk-node";
 import { ReadableSpan } from "@opentelemetry/sdk-trace-node";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import { EventEmitter } from "events";
-import { LumberjackContext } from "./context";
-import { getCommitSha, getEnvironmentInfo } from "./environment";
+import { LumberjackContext } from "./context.js";
+import { getCommitSha, getEnvironmentInfo } from "./environment.js";
 import type {
   EnrichedLogEntry,
   EnrichedRegisteredObject,
   Exporter,
-} from "./exporter";
-import { Gatekeeper } from "./gatekeeper";
-import { HttpExporter } from "./http-exporter";
-import { ObjectBatch, RegisteredObject } from "./object-batch";
-import { detectRuntime, getEnvironmentValue } from "./runtime";
-import { convertReadableSpansToOTLP, SpanBatch } from "./span-batch";
-import { LumberjackSpanProcessor } from "./span-processor";
-import { LogEntry, LogLevelType, LumberjackConfig } from "./types";
-import { getCallerInfo } from "./util/get-caller-info";
+} from "./exporter.js";
+import { Gatekeeper } from "./gatekeeper.js";
+import { HttpExporter } from "./http-exporter.js";
+import { ObjectBatch, RegisteredObject } from "./object-batch.js";
+import { detectRuntime, getEnvironmentValue } from "./runtime.js";
+import { convertReadableSpansToOTLP, SpanBatch } from "./span-batch.js";
+import { LumberjackSpanProcessor } from "./span-processor.js";
+import { LogEntry, LogLevelType, LumberjackConfig } from "./types.js";
+import { getCallerInfo } from "./util/get-caller-info.js";
 
 export class LumberjackCore extends EventEmitter {
   private static instance: LumberjackCore | null = null;

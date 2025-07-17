@@ -2,8 +2,8 @@
 
 import { promises as fs } from "fs";
 import { join } from "path";
-import { getEnvironmentValue } from "../runtime";
-import { GatekeeperSchema } from "../types";
+import { getEnvironmentValue } from "../runtime.js";
+import { GatekeeperSchema } from "../types.js";
 
 async function fetchGatekeeperSchema(
   serviceToken: string,

@@ -1,10 +1,10 @@
-import { LumberjackCore } from "./core";
-import { getEnvironmentValue } from "./runtime";
+import { LumberjackCore } from "./core.js";
+import { getEnvironmentValue } from "./runtime.js";
 import {
   GatekeeperResponse,
   GatekeeperResult,
   GatekeeperSchema,
-} from "./types";
+} from "./types.js";
 
 interface CacheEntry {
   value: boolean;

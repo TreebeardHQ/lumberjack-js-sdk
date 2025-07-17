@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "@jest/globals";
-import { LumberjackContext } from "./context";
+import { LumberjackContext } from "./context.js";
 
 describe("LumberjackContext", () => {
   beforeEach(() => {
