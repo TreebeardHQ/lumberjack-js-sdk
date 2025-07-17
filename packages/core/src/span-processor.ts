@@ -1,16 +1,16 @@
 import { Context } from "@opentelemetry/api";
 import { ReadableSpan, SpanProcessor } from "@opentelemetry/sdk-trace-node";
-import { TreebeardCore } from "./core.js";
+import { LumberjackCore } from "./core";
 
 /**
  * Custom OpenTelemetry SpanProcessor that captures all spans and exports them
- * through Treebeard's core SDK in OTLP format. Provides comprehensive distributed
+ * through Lumberjack's core SDK in OTLP format. Provides comprehensive distributed
  * tracing without manual instrumentation.
  */
-export class TreebeardSpanProcessor implements SpanProcessor {
-  private instance: TreebeardCore;
+export class LumberjackSpanProcessor implements SpanProcessor {
+  private instance: LumberjackCore;
   constructor(
-    private options: { debug?: boolean | undefined; instance: TreebeardCore }
+    private options: { debug?: boolean | undefined; instance: LumberjackCore }
   ) {
     this.instance = options.instance;
   }
@@ -20,7 +20,7 @@ export class TreebeardSpanProcessor implements SpanProcessor {
       this.options.debug &&
       span.attributes["next.span_type"] === "BaseServer.handleRequest"
     ) {
-      console.debug("[Treebeard] Starting span:", span.name);
+      console.debug("[Lumberjack] Starting span:", span.name);
     }
   }
 
@@ -29,7 +29,7 @@ export class TreebeardSpanProcessor implements SpanProcessor {
       // Always collect the span for export
       this.instance.addSpan(span);
       if (this.options.debug) {
-        console.debug("[Treebeard] Collected span:", span.name, {
+        console.debug("[Lumberjack] Collected span:", span.name, {
           traceId: span.spanContext().traceId,
           spanId: span.spanContext().spanId,
           name: span.name,

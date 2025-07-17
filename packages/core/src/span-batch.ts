@@ -38,7 +38,7 @@ export function convertReadableSpansToOTLP(
     scopeSpans: [
       {
         scope: {
-          name: spans[0]?.instrumentationScope?.name || "@treebeardhq/core",
+          name: spans[0]?.instrumentationScope?.name || "@lumberjack-sdk/core",
           version: spans[0]?.instrumentationScope?.version || "1.0.0",
         },
         spans: spans.map((span) => {

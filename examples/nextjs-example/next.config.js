@@ -1,12 +1,12 @@
-const { withTreebeardConfig } = require('@treebeardhq/nextjs/config');
+const { withLumberjackConfig } = require("@lumberjack-sdk/nextjs/config");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Next.js config options here
 };
 
-module.exports = withTreebeardConfig(nextConfig, {
-  // Treebeard config options
+module.exports = withLumberjackConfig(nextConfig, {
+  // Lumberjack config options
   debug: true,
   uploadSourceMaps: true,
 });

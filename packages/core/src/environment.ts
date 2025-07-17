@@ -19,124 +19,124 @@ export interface EnvironmentInfo {
  */
 const ENV_VAR_MAPPINGS = {
   commitSha: [
-    'TREEBEARD_COMMIT_SHA',
-    'VERCEL_GIT_COMMIT_SHA',
-    'GITHUB_SHA',
-    'CI_COMMIT_SHA',
-    'COMMIT_SHA',
-    'GIT_COMMIT',
-    'HEROKU_SLUG_COMMIT',
-    'RENDER_GIT_COMMIT',
-    'RAILWAY_GIT_COMMIT_SHA',
-    'CF_PAGES_COMMIT_SHA',
-    'NETLIFY_COMMIT_REF',
-    'CIRCLE_SHA1',
-    'TRAVIS_COMMIT',
-    'BUILDKITE_COMMIT',
-    'DRONE_COMMIT_SHA',
-    'BITBUCKET_COMMIT',
-    'AZURE_BUILD_SOURCEVERSION',
-    'CODEBUILD_RESOLVED_SOURCE_VERSION'
+    "LUMBERJACK_COMMIT_SHA",
+    "VERCEL_GIT_COMMIT_SHA",
+    "GITHUB_SHA",
+    "CI_COMMIT_SHA",
+    "COMMIT_SHA",
+    "GIT_COMMIT",
+    "HEROKU_SLUG_COMMIT",
+    "RENDER_GIT_COMMIT",
+    "RAILWAY_GIT_COMMIT_SHA",
+    "CF_PAGES_COMMIT_SHA",
+    "NETLIFY_COMMIT_REF",
+    "CIRCLE_SHA1",
+    "TRAVIS_COMMIT",
+    "BUILDKITE_COMMIT",
+    "DRONE_COMMIT_SHA",
+    "BITBUCKET_COMMIT",
+    "AZURE_BUILD_SOURCEVERSION",
+    "CODEBUILD_RESOLVED_SOURCE_VERSION",
   ],
   branch: [
-    'TREEBEARD_BRANCH',
-    'VERCEL_GIT_COMMIT_REF',
-    'GITHUB_REF_NAME',
-    'CI_COMMIT_REF_NAME',
-    'GIT_BRANCH',
-    'HEROKU_SLUG_DESCRIPTION',
-    'RENDER_GIT_BRANCH',
-    'RAILWAY_GIT_BRANCH',
-    'CF_PAGES_BRANCH',
-    'NETLIFY_BRANCH',
-    'CIRCLE_BRANCH',
-    'TRAVIS_BRANCH',
-    'BUILDKITE_BRANCH',
-    'DRONE_COMMIT_BRANCH',
-    'BITBUCKET_BRANCH',
-    'SYSTEM_PULLREQUEST_SOURCEBRANCH'
+    "LUMBERJACK_BRANCH",
+    "VERCEL_GIT_COMMIT_REF",
+    "GITHUB_REF_NAME",
+    "CI_COMMIT_REF_NAME",
+    "GIT_BRANCH",
+    "HEROKU_SLUG_DESCRIPTION",
+    "RENDER_GIT_BRANCH",
+    "RAILWAY_GIT_BRANCH",
+    "CF_PAGES_BRANCH",
+    "NETLIFY_BRANCH",
+    "CIRCLE_BRANCH",
+    "TRAVIS_BRANCH",
+    "BUILDKITE_BRANCH",
+    "DRONE_COMMIT_BRANCH",
+    "BITBUCKET_BRANCH",
+    "SYSTEM_PULLREQUEST_SOURCEBRANCH",
   ],
   buildId: [
-    'TREEBEARD_BUILD_ID',
-    'VERCEL_BUILD_ID',
-    'GITHUB_RUN_ID',
-    'CI_PIPELINE_ID',
-    'BUILD_ID',
-    'HEROKU_RELEASE_VERSION',
-    'RENDER_SERVICE_ID',
-    'RAILWAY_DEPLOYMENT_ID',
-    'CF_PAGES_BUILD_ID',
-    'NETLIFY_BUILD_ID',
-    'CIRCLE_BUILD_NUM',
-    'TRAVIS_BUILD_ID',
-    'BUILDKITE_BUILD_ID',
-    'DRONE_BUILD_NUMBER',
-    'BITBUCKET_BUILD_NUMBER',
-    'AZURE_BUILD_BUILDID',
-    'CODEBUILD_BUILD_ID'
+    "LUMBERJACK_BUILD_ID",
+    "VERCEL_BUILD_ID",
+    "GITHUB_RUN_ID",
+    "CI_PIPELINE_ID",
+    "BUILD_ID",
+    "HEROKU_RELEASE_VERSION",
+    "RENDER_SERVICE_ID",
+    "RAILWAY_DEPLOYMENT_ID",
+    "CF_PAGES_BUILD_ID",
+    "NETLIFY_BUILD_ID",
+    "CIRCLE_BUILD_NUM",
+    "TRAVIS_BUILD_ID",
+    "BUILDKITE_BUILD_ID",
+    "DRONE_BUILD_NUMBER",
+    "BITBUCKET_BUILD_NUMBER",
+    "AZURE_BUILD_BUILDID",
+    "CODEBUILD_BUILD_ID",
   ],
   deploymentId: [
-    'TREEBEARD_DEPLOYMENT_ID',
-    'VERCEL_DEPLOYMENT_ID',
-    'GITHUB_DEPLOYMENT_ID',
-    'CI_DEPLOYMENT_ID',
-    'DEPLOYMENT_ID',
-    'HEROKU_DYNO_ID',
-    'RENDER_INSTANCE_ID',
-    'RAILWAY_REPLICA_ID',
-    'CF_PAGES_URL',
-    'NETLIFY_DEPLOY_ID'
+    "LUMBERJACK_DEPLOYMENT_ID",
+    "VERCEL_DEPLOYMENT_ID",
+    "GITHUB_DEPLOYMENT_ID",
+    "CI_DEPLOYMENT_ID",
+    "DEPLOYMENT_ID",
+    "HEROKU_DYNO_ID",
+    "RENDER_INSTANCE_ID",
+    "RAILWAY_REPLICA_ID",
+    "CF_PAGES_URL",
+    "NETLIFY_DEPLOY_ID",
   ],
   platform: [
-    'TREEBEARD_PLATFORM',
-    'VERCEL',
-    'GITHUB_ACTIONS',
-    'GITLAB_CI',
-    'CIRCLECI',
-    'TRAVIS',
-    'HEROKU',
-    'RENDER',
-    'RAILWAY',
-    'NETLIFY',
-    'CF_PAGES',
-    'BUILDKITE',
-    'DRONE',
-    'AZURE_HTTP_USER_AGENT',
-    'CODEBUILD_BUILD_ARN'
+    "LUMBERJACK_PLATFORM",
+    "VERCEL",
+    "GITHUB_ACTIONS",
+    "GITLAB_CI",
+    "CIRCLECI",
+    "TRAVIS",
+    "HEROKU",
+    "RENDER",
+    "RAILWAY",
+    "NETLIFY",
+    "CF_PAGES",
+    "BUILDKITE",
+    "DRONE",
+    "AZURE_HTTP_USER_AGENT",
+    "CODEBUILD_BUILD_ARN",
   ],
   environment: [
-    'TREEBEARD_ENVIRONMENT',
-    'VERCEL_ENV',
-    'GITHUB_ENVIRONMENT',
-    'CI_ENVIRONMENT_NAME',
-    'ENVIRONMENT',
-    'NODE_ENV',
-    'STAGE',
-    'DEPLOYMENT_ENV',
-    'APP_ENV'
+    "LUMBERJACK_ENVIRONMENT",
+    "VERCEL_ENV",
+    "GITHUB_ENVIRONMENT",
+    "CI_ENVIRONMENT_NAME",
+    "ENVIRONMENT",
+    "NODE_ENV",
+    "STAGE",
+    "DEPLOYMENT_ENV",
+    "APP_ENV",
   ],
   version: [
-    'TREEBEARD_VERSION',
-    'VERCEL_GIT_COMMIT_MESSAGE',
-    'GITHUB_REF',
-    'CI_COMMIT_TAG',
-    'VERSION',
-    'RELEASE_VERSION',
-    'APP_VERSION',
-    'PACKAGE_VERSION'
+    "LUMBERJACK_VERSION",
+    "VERCEL_GIT_COMMIT_MESSAGE",
+    "GITHUB_REF",
+    "CI_COMMIT_TAG",
+    "VERSION",
+    "RELEASE_VERSION",
+    "APP_VERSION",
+    "PACKAGE_VERSION",
   ],
   region: [
-    'TREEBEARD_REGION',
-    'VERCEL_REGION',
-    'AWS_REGION',
-    'AWS_DEFAULT_REGION',
-    'GOOGLE_CLOUD_REGION',
-    'AZURE_REGION',
-    'HEROKU_REGION',
-    'RENDER_REGION',
-    'RAILWAY_REGION',
-    'CF_PAGES_BRANCH' // Cloudflare doesn't expose region directly
-  ]
+    "LUMBERJACK_REGION",
+    "VERCEL_REGION",
+    "AWS_REGION",
+    "AWS_DEFAULT_REGION",
+    "GOOGLE_CLOUD_REGION",
+    "AZURE_REGION",
+    "HEROKU_REGION",
+    "RENDER_REGION",
+    "RAILWAY_REGION",
+    "CF_PAGES_BRANCH", // Cloudflare doesn't expose region directly
+  ],
 };
 
 /**
@@ -157,7 +157,7 @@ const PLATFORM_DETECTION = {
   drone: () => !!process.env.DRONE,
   azure: () => !!process.env.AZURE_HTTP_USER_AGENT,
   codebuild: () => !!process.env.CODEBUILD_BUILD_ARN,
-  bitbucket: () => !!process.env.BITBUCKET_BUILD_NUMBER
+  bitbucket: () => !!process.env.BITBUCKET_BUILD_NUMBER,
 };
 
 /**
@@ -166,7 +166,7 @@ const PLATFORM_DETECTION = {
 function getFirstAvailableEnvVar(envVars: string[]): string | undefined {
   for (const envVar of envVars) {
     const value = process.env[envVar];
-    if (value && value.trim() !== '') {
+    if (value && value.trim() !== "") {
       return value.trim();
     }
   }
@@ -197,15 +197,15 @@ export function getCommitSha(): string | undefined {
  */
 export function getBranch(): string | undefined {
   let branch = getFirstAvailableEnvVar(ENV_VAR_MAPPINGS.branch);
-  
+
   // Clean up GitHub refs (refs/heads/main -> main)
-  if (branch?.startsWith('refs/heads/')) {
-    branch = branch.replace('refs/heads/', '');
+  if (branch?.startsWith("refs/heads/")) {
+    branch = branch.replace("refs/heads/", "");
   }
-  if (branch?.startsWith('refs/tags/')) {
-    branch = branch.replace('refs/tags/', '');
+  if (branch?.startsWith("refs/tags/")) {
+    branch = branch.replace("refs/tags/", "");
   }
-  
+
   return branch;
 }
 
@@ -256,7 +256,7 @@ export function getEnvironmentInfo(): EnvironmentInfo {
     platform: detectPlatform(),
     environment: getEnvironmentName(),
     version: getVersion(),
-    region: getRegion()
+    region: getRegion(),
   };
 }
 
@@ -266,14 +266,14 @@ export function getEnvironmentInfo(): EnvironmentInfo {
 export function getDeploymentContext(): string {
   const info = getEnvironmentInfo();
   const parts: string[] = [];
-  
+
   if (info.platform) parts.push(`platform=${info.platform}`);
   if (info.environment) parts.push(`env=${info.environment}`);
   if (info.branch) parts.push(`branch=${info.branch}`);
   if (info.commitSha) parts.push(`commit=${info.commitSha.substring(0, 8)}`);
   if (info.region) parts.push(`region=${info.region}`);
-  
-  return parts.join(' ');
+
+  return parts.join(" ");
 }
 
 /**
@@ -294,10 +294,10 @@ export function isCI(): boolean {
 export function isProduction(): boolean {
   const env = getEnvironmentName()?.toLowerCase();
   return !!(
-    env === 'production' ||
-    env === 'prod' ||
-    process.env.VERCEL_ENV === 'production' ||
-    process.env.NODE_ENV === 'production'
+    env === "production" ||
+    env === "prod" ||
+    process.env.VERCEL_ENV === "production" ||
+    process.env.NODE_ENV === "production"
   );
 }
 
@@ -307,31 +307,34 @@ export function isProduction(): boolean {
 export function isDevelopment(): boolean {
   const env = getEnvironmentName()?.toLowerCase();
   return !!(
-    env === 'development' ||
-    env === 'dev' ||
-    env === 'local' ||
-    process.env.VERCEL_ENV === 'development' ||
-    process.env.NODE_ENV === 'development'
+    env === "development" ||
+    env === "dev" ||
+    env === "local" ||
+    process.env.VERCEL_ENV === "development" ||
+    process.env.NODE_ENV === "development"
   );
 }
 
 /**
- * Get environment variable with fallback to Treebeard-specific naming
+ * Get environment variable with fallback to Lumberjack-specific naming
  */
-export function getEnvironmentValue(key: string, fallbacks: string[] = []): string | undefined {
+export function getEnvironmentValue(
+  key: string,
+  fallbacks: string[] = []
+): string | undefined {
   // Try the exact key first
   const direct = process.env[key];
-  if (direct && direct.trim() !== '') {
+  if (direct && direct.trim() !== "") {
     return direct.trim();
   }
-  
+
   // Try fallbacks
   for (const fallback of fallbacks) {
     const value = process.env[fallback];
-    if (value && value.trim() !== '') {
+    if (value && value.trim() !== "") {
       return value.trim();
     }
   }
-  
+
   return undefined;
 }

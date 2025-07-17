@@ -1,8 +1,8 @@
 {
-  "name": "treebeard-js-sdk",
+  "name": "lumberjack-js-sdk",
   "version": "0.1.0",
   "private": false,
-  "description": "Monorepo for Treebeard JavaScript/TypeScript SDK packages",
+  "description": "Monorepo for Lumberjack JavaScript/TypeScript SDK packages",
   "type": "module",
   "workspaces": [
     "packages/*"
@@ -42,6 +42,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/treebeardhq/js-sdk"
+    "url": "https://github.com/treebeardhq/lumberjack-js-sdk"
   }
 }

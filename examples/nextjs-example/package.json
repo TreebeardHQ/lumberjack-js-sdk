@@ -9,8 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@treebeardhq/core": "file:../../packages/core",
-    "@treebeardhq/nextjs": "file:../../packages/nextjs",
+    "@lumberjack-sdk/core": "file:../../packages/core",
+    "@lumberjack-sdk/nextjs": "file:../../packages/nextjs",
     "next": "15.3.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

@@ -1,13 +1,13 @@
 {
-  "name": "@treebeardhq/core",
+  "name": "@lumberjack-sdk/core",
   "version": "0.1.2-5",
-  "description": "Core JavaScript/TypeScript SDK for Treebeard logging and tracing",
+  "description": "Core JavaScript/TypeScript SDK for Lumberjack logging and tracing",
   "type": "module",
   "private": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "treebeardhq": "./dist/cli/index.js"
+    "lumberjack-sdk-cli": "./dist/cli/index.js"
   },
   "publishConfig": {
     "access": "public"
@@ -63,6 +63,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/treebeardhq/js-sdk"
+    "url": "https://github.com/treebeardhq/lumberjack-js-sdk"
   }
 }

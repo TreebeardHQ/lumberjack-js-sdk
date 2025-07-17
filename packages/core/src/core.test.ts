@@ -6,22 +6,22 @@ import {
   it,
   jest,
 } from "@jest/globals";
-import { MockExporter } from "./__mocks__/mock-exporter.js";
-import { TreebeardContext } from "./context.js";
-import { TreebeardCore } from "./core.js";
-import type { EnrichedLogEntry, ExportResult } from "./exporter.js";
+import { MockExporter } from "./__mocks__/mock-exporter";
+import { LumberjackContext } from "./context";
+import { LumberjackCore } from "./core";
+import type { EnrichedLogEntry, ExportResult } from "./exporter";
 
-describe("TreebeardCore", () => {
-  let core: TreebeardCore;
+describe("LumberjackCore", () => {
+  let core: LumberjackCore;
   let fetchMock: any;
 
   beforeEach(() => {
     // Clear singleton instance
-    (TreebeardCore as any).instance = null;
+    (LumberjackCore as any).instance = null;
 
     // Clear environment variables to avoid test interference
-    delete process.env.TREEBEARD_API_KEY;
-    delete process.env.TREEBEARD_ENDPOINT;
+    delete process.env.LUMBERJACK_API_KEY;
+    delete process.env.LUMBERJACK_ENDPOINT;
 
     // Mock fetch
     fetchMock = jest.fn();
@@ -47,25 +47,25 @@ describe("TreebeardCore", () => {
 
   describe("Singleton Pattern", () => {
     it("should return the same instance when created multiple times", () => {
-      const instance1 = new TreebeardCore();
-      const instance2 = new TreebeardCore();
+      const instance1 = new LumberjackCore();
+      const instance2 = new LumberjackCore();
       expect(instance1).toBe(instance2);
     });
 
     it("should return same instance from init and getInstance", () => {
-      const instance1 = TreebeardCore.init();
-      const instance2 = TreebeardCore.getInstance();
+      const instance1 = LumberjackCore.init();
+      const instance2 = LumberjackCore.getInstance();
       expect(instance1).toBe(instance2);
     });
 
     it("should return null from getInstance before initialization", () => {
-      expect(TreebeardCore.getInstance()).toBeNull();
+      expect(LumberjackCore.getInstance()).toBeNull();
     });
   });
 
   describe("Configuration", () => {
     it("should use default configuration when no config provided", () => {
-      core = new TreebeardCore();
+      core = new LumberjackCore();
 
       // Test configuration through behavior
       core.info("test message");
@@ -75,7 +75,7 @@ describe("TreebeardCore", () => {
     });
 
     it("should merge provided config with defaults", () => {
-      core = new TreebeardCore({
+      core = new LumberjackCore({
         projectName: "test-project",
         batchSize: 1,
         apiKey: "test-key",
@@ -88,10 +88,10 @@ describe("TreebeardCore", () => {
     });
 
     it("should use environment variables for API configuration", () => {
-      const originalEnv = process.env.TREEBEARD_API_KEY;
-      process.env.TREEBEARD_API_KEY = "test-api-key";
+      const originalEnv = process.env.LUMBERJACK_API_KEY;
+      process.env.LUMBERJACK_API_KEY = "test-api-key";
 
-      core = new TreebeardCore({ batchSize: 1 });
+      core = new LumberjackCore({ batchSize: 1 });
       core.info("test message");
 
       expect(fetchMock).toHaveBeenCalledWith(
@@ -103,13 +103,13 @@ describe("TreebeardCore", () => {
         })
       );
 
-      process.env.TREEBEARD_API_KEY = originalEnv;
+      process.env.LUMBERJACK_API_KEY = originalEnv;
     });
   });
 
   describe("Logging Methods", () => {
     beforeEach(() => {
-      core = new TreebeardCore({ batchSize: 1, apiKey: "test-key" });
+      core = new LumberjackCore({ batchSize: 1, apiKey: "test-key" });
     });
 
     it("should log messages with correct levels", async () => {
@@ -162,14 +162,14 @@ describe("TreebeardCore", () => {
 
   describe("Trace Context Integration", () => {
     beforeEach(() => {
-      core = new TreebeardCore({ batchSize: 1, apiKey: "test-key" });
+      core = new LumberjackCore({ batchSize: 1, apiKey: "test-key" });
     });
 
-    it("should include trace context from TreebeardContext", () => {
-      const traceId = TreebeardContext.generateTraceId();
-      const spanId = TreebeardContext.generateSpanId();
+    it("should include trace context from LumberjackContext", () => {
+      const traceId = LumberjackContext.generateTraceId();
+      const spanId = LumberjackContext.generateSpanId();
 
-      TreebeardContext.run({ traceId, spanId }, () => {
+      LumberjackContext.run({ traceId, spanId }, () => {
         core.info("test message");
       });
 
@@ -184,7 +184,7 @@ describe("TreebeardCore", () => {
 
   describe("Console Capture", () => {
     beforeEach(() => {
-      core = new TreebeardCore({
+      core = new LumberjackCore({
         captureConsole: true,
         batchSize: 1,
         apiKey: "test-key",
@@ -216,9 +216,9 @@ describe("TreebeardCore", () => {
       );
     });
 
-    it("should not capture Treebeard internal messages", () => {
+    it("should not capture Lumberjack internal messages", () => {
       fetchMock.mockClear();
-      console.log("[Treebeard] internal message");
+      console.log("[Lumberjack] internal message");
 
       expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -226,7 +226,7 @@ describe("TreebeardCore", () => {
 
   describe("Batching and Flushing", () => {
     it("should batch logs until batch size is reached", () => {
-      core = new TreebeardCore({ batchSize: 3, apiKey: "test-key" });
+      core = new LumberjackCore({ batchSize: 3, apiKey: "test-key" });
 
       core.info("message 1");
       core.info("message 2");
@@ -237,7 +237,7 @@ describe("TreebeardCore", () => {
     });
 
     it("should flush logs manually", async () => {
-      core = new TreebeardCore({ batchSize: 100, apiKey: "test-key" });
+      core = new LumberjackCore({ batchSize: 100, apiKey: "test-key" });
 
       core.info("test message");
       expect(fetchMock).not.toHaveBeenCalled();
@@ -247,7 +247,7 @@ describe("TreebeardCore", () => {
     });
 
     it("should not flush empty buffer", async () => {
-      core = new TreebeardCore({ apiKey: "test-key" });
+      core = new LumberjackCore({ apiKey: "test-key" });
 
       await core.flush();
       expect(fetchMock).not.toHaveBeenCalled();
@@ -257,13 +257,13 @@ describe("TreebeardCore", () => {
       const consoleSpy = jest
         .spyOn(console, "log")
         .mockImplementation(() => {});
-      core = new TreebeardCore({ batchSize: 1 });
+      core = new LumberjackCore({ batchSize: 1 });
 
       core.info("test message");
 
       expect(fetchMock).not.toHaveBeenCalled();
       expect(consoleSpy).toHaveBeenCalledWith(
-        "[Treebeard]",
+        "[Lumberjack]",
         expect.stringContaining('"message":"test message"')
       );
     });
@@ -271,7 +271,7 @@ describe("TreebeardCore", () => {
 
   describe("Error Handling", () => {
     beforeEach(() => {
-      core = new TreebeardCore({ batchSize: 1, apiKey: "test-key" });
+      core = new LumberjackCore({ batchSize: 1, apiKey: "test-key" });
     });
 
     it("should handle fetch errors gracefully", async () => {
@@ -315,9 +315,9 @@ describe("TreebeardCore", () => {
       const failingExporter = new FailingMockExporter();
 
       // Reset the singleton instance
-      (TreebeardCore as any).instance = null;
+      (LumberjackCore as any).instance = null;
 
-      core = new TreebeardCore({
+      core = new LumberjackCore({
         batchSize: 100,
         apiKey: "test-key",
         exporter: failingExporter,
@@ -337,7 +337,7 @@ describe("TreebeardCore", () => {
 
   describe("Shutdown", () => {
     it("should prevent logging after shutdown", async () => {
-      core = new TreebeardCore({ batchSize: 1, apiKey: "test-key" });
+      core = new LumberjackCore({ batchSize: 1, apiKey: "test-key" });
 
       await core.shutdown();
 
@@ -348,7 +348,7 @@ describe("TreebeardCore", () => {
     });
 
     it("should flush remaining logs on shutdown", async () => {
-      core = new TreebeardCore({ batchSize: 100, apiKey: "test-key" });
+      core = new LumberjackCore({ batchSize: 100, apiKey: "test-key" });
 
       core.info("test message");
       await core.shutdown();
@@ -357,30 +357,30 @@ describe("TreebeardCore", () => {
     });
 
     it("should clear singleton instance on shutdown", async () => {
-      core = new TreebeardCore();
+      core = new LumberjackCore();
 
       await core.shutdown();
 
-      expect(TreebeardCore.getInstance()).toBeNull();
+      expect(LumberjackCore.getInstance()).toBeNull();
     });
   });
 
   describe("Exporter Integration", () => {
     it("should use default HttpExporter when no exporter provided", () => {
-      core = new TreebeardCore({
+      core = new LumberjackCore({
         apiKey: "test-key",
         endpoint: "https://api.example.com/logs/batch",
         projectName: "test-project",
       });
 
       // We can't directly access the private exporter, but we can verify behavior
-      expect(core).toBeInstanceOf(TreebeardCore);
+      expect(core).toBeInstanceOf(LumberjackCore);
     });
 
     it("should use provided custom exporter", async () => {
       const mockExporter = new MockExporter();
 
-      core = new TreebeardCore({
+      core = new LumberjackCore({
         apiKey: "test-key",
         projectName: "test-project",
         exporter: mockExporter,
@@ -405,7 +405,7 @@ describe("TreebeardCore", () => {
         .spyOn(console, "error")
         .mockImplementation(() => {});
 
-      core = new TreebeardCore({
+      core = new LumberjackCore({
         apiKey: "test-key",
         projectName: "test-project",
         exporter: mockExporter,
@@ -417,7 +417,7 @@ describe("TreebeardCore", () => {
 
       // Verify error was logged
       expect(consoleSpy).toHaveBeenCalledWith(
-        "[Treebeard]: Failed to send logs:",
+        "[Lumberjack]: Failed to send logs:",
         "Export failed"
       );
 
@@ -430,7 +430,7 @@ describe("TreebeardCore", () => {
     it("should export objects through custom exporter", async () => {
       const mockExporter = new MockExporter();
 
-      core = new TreebeardCore({
+      core = new LumberjackCore({
         apiKey: "test-key",
         projectName: "test-project",
         exporter: mockExporter,
@@ -440,7 +440,7 @@ describe("TreebeardCore", () => {
 
       // Register an object to trigger export
       const testObject = { id: "test-obj", name: "test", value: 123 };
-      TreebeardCore.register(testObject);
+      LumberjackCore.register(testObject);
 
       // Wait longer for async processing
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -459,7 +459,7 @@ describe("TreebeardCore", () => {
         .spyOn(console, "error")
         .mockImplementation(() => {});
 
-      core = new TreebeardCore({
+      core = new LumberjackCore({
         apiKey: "test-key",
         projectName: "test-project",
         exporter: mockExporter,
@@ -468,14 +468,14 @@ describe("TreebeardCore", () => {
       });
 
       const testObject = { id: "test-obj-2", name: "test", value: 123 };
-      TreebeardCore.register(testObject);
+      LumberjackCore.register(testObject);
 
       // Wait for async processing
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Verify error was logged
       expect(consoleSpy).toHaveBeenCalledWith(
-        "[Treebeard]: Failed to send objects:",
+        "[Lumberjack]: Failed to send objects:",
         "Object export failed"
       );
 
@@ -485,7 +485,7 @@ describe("TreebeardCore", () => {
     it("should transform logs correctly for exporter", async () => {
       const mockExporter = new MockExporter();
 
-      core = new TreebeardCore({
+      core = new LumberjackCore({
         apiKey: "test-key",
         projectName: "test-project",
         exporter: mockExporter,
@@ -512,7 +512,7 @@ describe("TreebeardCore", () => {
     it("should transform objects correctly for exporter", async () => {
       const mockExporter = new MockExporter();
 
-      core = new TreebeardCore({
+      core = new LumberjackCore({
         apiKey: "test-key",
         projectName: "test-project",
         exporter: mockExporter,
@@ -525,7 +525,7 @@ describe("TreebeardCore", () => {
         name: "test",
         nested: { value: 123 },
       };
-      TreebeardCore.register(testObject);
+      LumberjackCore.register(testObject);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
 
@@ -545,7 +545,7 @@ describe("TreebeardCore", () => {
 
       const mockExporter = new MockExporter();
 
-      core = new TreebeardCore({
+      core = new LumberjackCore({
         apiKey: "test-key",
         projectName: "test-project",
         exporter: mockExporter,

@@ -1,6 +1,6 @@
-import { TreebeardCore, log } from "@treebeardhq/core";
-import { type Instrumentation } from "next";
+import { LumberjackCore, log } from "@lumberjack-sdk/core";
 import { trace } from "@opentelemetry/api";
+import { type Instrumentation } from "next";
 // extend Instrumentation.onRequestError add additioanml optons param:
 
 export const onRequestError: Instrumentation.onRequestError = async (
@@ -12,7 +12,7 @@ export const onRequestError: Instrumentation.onRequestError = async (
 
   const currentSpan = trace.getActiveSpan();
 
-  console.log("[Treebeard] onRequestError", {
+  console.log("[Lumberjack] onRequestError", {
     err,
     request,
     context,
@@ -40,5 +40,5 @@ export const onRequestError: Instrumentation.onRequestError = async (
   });
 
   // flush errors
-  return await TreebeardCore.getInstance()?.flush();
+  return await LumberjackCore.getInstance()?.flush();
 };

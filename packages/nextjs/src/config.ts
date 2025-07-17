@@ -3,10 +3,10 @@ import { existsSync, readdirSync, readFileSync, statSync } from "fs";
 import type { NextConfig } from "next";
 import { join, relative } from "path";
 
-export interface TreebeardConfigOptions {
+export interface LumberjackConfigOptions {
   /**
    * Service token for uploading sourcemaps
-   * Will be read from TREEBEARD_SERVICE_TOKEN environment variable if not provided
+   * Will be read from LUMBERJACK_SERVICE_TOKEN environment variable if not provided
    */
   serviceToken?: string;
 
@@ -18,7 +18,7 @@ export interface TreebeardConfigOptions {
 
   /**
    * Custom sourcemap upload endpoint
-   * @default 'https://api.treebeardhq.com/source_maps'
+   * @default 'https://api.trylumberjack.com/source_maps'
    */
   uploadUrl?: string;
 
@@ -48,12 +48,12 @@ function getGitCommitSha(debug = false): string | null {
   try {
     const commit = execSync("git rev-parse HEAD", { encoding: "utf8" }).trim();
     if (debug) {
-      console.log("[Treebeard] Detected git commit:", commit);
+      console.log("[Lumberjack] Detected git commit:", commit);
     }
     return commit;
   } catch (error) {
     if (debug) {
-      console.warn("[Treebeard] Failed to detect git commit:", error);
+      console.warn("[Lumberjack] Failed to detect git commit:", error);
     }
     return null;
   }
@@ -70,7 +70,7 @@ function getProjectName(debug = false): string | null {
       const name = packageJson.name;
       if (debug) {
         console.log(
-          "[Treebeard] Detected project name from package.json:",
+          "[Lumberjack] Detected project name from package.json:",
           name
         );
       }
@@ -79,7 +79,7 @@ function getProjectName(debug = false): string | null {
   } catch (error) {
     if (debug) {
       console.warn(
-        "[Treebeard] Failed to read project name from package.json:",
+        "[Lumberjack] Failed to read project name from package.json:",
         error
       );
     }
@@ -138,13 +138,13 @@ function findSourceMapFiles(
     } catch (error) {
       if (debug) {
         console.warn(
-          "[Treebeard] Error finding client sourcemap files:",
+          "[Lumberjack] Error finding client sourcemap files:",
           error
         );
       }
     }
   } else if (debug) {
-    console.warn("[Treebeard] No .next/static directory found");
+    console.warn("[Lumberjack] No .next/static directory found");
   }
 
   // Find server-side source maps in .next/server
@@ -161,17 +161,17 @@ function findSourceMapFiles(
     } catch (error) {
       if (debug) {
         console.warn(
-          "[Treebeard] Error finding server sourcemap files:",
+          "[Lumberjack] Error finding server sourcemap files:",
           error
         );
       }
     }
   } else if (debug) {
-    console.warn("[Treebeard] No .next/server directory found");
+    console.warn("[Lumberjack] No .next/server directory found");
   }
 
   if (debug) {
-    console.log("[Treebeard] Found sourcemap files:", files.length);
+    console.log("[Lumberjack] Found sourcemap files:", files.length);
     files.forEach((file: { filePath: string; url: string }) => {
       console.log(`  ${file.url} -> ${file.filePath}`);
     });
@@ -207,13 +207,13 @@ async function createSourceMapFormData(
 
       if (debug) {
         console.log(
-          `[Treebeard] Added sourcemap: ${file.url} (${content.length} bytes)`
+          `[Lumberjack] Added sourcemap: ${file.url} (${content.length} bytes)`
         );
       }
     } catch (error) {
       if (debug) {
         console.warn(
-          `[Treebeard] Failed to read sourcemap file ${file.filePath}:`,
+          `[Lumberjack] Failed to read sourcemap file ${file.filePath}:`,
           error
         );
       }
@@ -224,12 +224,12 @@ async function createSourceMapFormData(
 }
 
 /**
- * Upload sourcemaps to Treebeard
+ * Upload sourcemaps to Lumberjack
  */
 async function uploadSourceMapsImpl(
   options: Required<
     Pick<
-      TreebeardConfigOptions,
+      LumberjackConfigOptions,
       "serviceToken" | "uploadUrl" | "project" | "commit" | "debug"
     >
   >
@@ -238,7 +238,7 @@ async function uploadSourceMapsImpl(
 
   try {
     if (debug) {
-      console.log("[Treebeard] Starting sourcemap upload...", {
+      console.log("[Lumberjack] Starting sourcemap upload...", {
         project,
         commit,
         uploadUrl,
@@ -250,7 +250,7 @@ async function uploadSourceMapsImpl(
 
     if (sourcemapFiles.length === 0) {
       if (debug) {
-        console.log("[Treebeard] No sourcemap files found, skipping upload");
+        console.log("[Lumberjack] No sourcemap files found, skipping upload");
       }
       return;
     }
@@ -264,15 +264,15 @@ async function uploadSourceMapsImpl(
     );
 
     if (debug) {
-      console.log("[Treebeard] Form data:", formData);
+      console.log("[Lumberjack] Form data:", formData);
     }
 
-    // Upload to Treebeard API
+    // Upload to Lumberjack API
     const response = await fetch(uploadUrl, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${serviceToken}`,
-        "User-Agent": "@treebeardhq/nextjs",
+        "User-Agent": "@lumberjack-sdk/nextjs",
       },
       body: formData,
     });
@@ -285,14 +285,14 @@ async function uploadSourceMapsImpl(
     const result = await response.json();
 
     if (debug) {
-      console.log("[Treebeard] Sourcemap upload successful:", result);
+      console.log("[Lumberjack] Sourcemap upload successful:", result);
     } else {
       console.log(
-        `[Treebeard] Successfully uploaded ${sourcemapFiles.length} sourcemap(s) for ${project}@${commit}`
+        `[Lumberjack] Successfully uploaded ${sourcemapFiles.length} sourcemap(s) for ${project}@${commit}`
       );
     }
   } catch (error) {
-    console.error("[Treebeard] Failed to upload sourcemaps:", error);
+    console.error("[Lumberjack] Failed to upload sourcemaps:", error);
     throw error;
   }
 }
@@ -304,34 +304,34 @@ function validateServiceToken(
   serviceToken?: string,
   debug = false
 ): string | null {
-  const token = serviceToken || process.env.TREEBEARD_SERVICE_TOKEN;
+  const token = serviceToken || process.env.LUMBERJACK_SERVICE_TOKEN;
 
   if (!token) {
     console.warn(
-      "\n⚠️  [Treebeard] Service token not found!\n" +
+      "\n⚠️  [Lumberjack] Service token not found!\n" +
         "Sourcemap uploading is disabled. To enable it:\n" +
-        "1. Get your service token from: https://app.treebeardhq.com/service-token\n" +
-        "2. Set TREEBEARD_SERVICE_TOKEN environment variable\n" +
-        '   or pass it to withTreebeardConfig({ serviceToken: "..." })\n'
+        "1. Get your service token from: https://app.trylumberjack.com/service-token\n" +
+        "2. Set LUMBERJACK_SERVICE_TOKEN environment variable\n" +
+        '   or pass it to withLumberjackConfig({ serviceToken: "..." })\n'
     );
     return null;
   }
 
   if (debug) {
-    console.log("[Treebeard] Service token found");
+    console.log("[Lumberjack] Service token found");
   }
 
   return token;
 }
 
 /**
- * Wraps Next.js config to add Treebeard functionality
+ * Wraps Next.js config to add Lumberjack functionality
  */
-export function withTreebeardConfig(
-  nextConfig: NextConfig & TreebeardConfigOptions = {},
-  treebeardOptions: TreebeardConfigOptions = {}
+export function withLumberjackConfig(
+  nextConfig: NextConfig & LumberjackConfigOptions = {},
+  lumberjackOptions: LumberjackConfigOptions = {}
 ): NextConfig {
-  // Extract Treebeard options from nextConfig and merge with treebeardOptions
+  // Extract Lumberjack options from nextConfig and merge with lumberjackOptions
   const {
     serviceToken: configServiceToken,
     uploadSourceMaps: configUploadSourceMaps,
@@ -345,13 +345,13 @@ export function withTreebeardConfig(
   const {
     serviceToken = configServiceToken,
     uploadSourceMaps = configUploadSourceMaps ?? true,
-    uploadUrl = configUploadUrl ?? "https://api.treebeardhq.com/source_maps",
+    uploadUrl = configUploadUrl ?? "https://api.trylumberjack.com/source_maps",
     project = configProject,
     commit = configCommit,
     debug = configDebug ?? false,
-  } = treebeardOptions;
+  } = lumberjackOptions;
 
-  const commitEnvVar = "TREEBEARD_COMMIT_SHA";
+  const commitEnvVar = "LUMBERJACK_COMMIT_SHA";
 
   // Validate service token
   const validatedServiceToken = validateServiceToken(serviceToken, debug);
@@ -363,7 +363,7 @@ export function withTreebeardConfig(
   const projectName = project || getProjectName(debug) || "unknown";
 
   if (debug) {
-    console.log("[Treebeard] Config wrapper initialized", {
+    console.log("[Lumberjack] Config wrapper initialized", {
       uploadSourceMaps,
       uploadUrl,
       project: projectName,
@@ -381,7 +381,7 @@ export function withTreebeardConfig(
   if (commitSha) {
     env[commitEnvVar] = commitSha;
     console.log(
-      `[Treebeard] Injected ${commitEnvVar}=${commitSha} into environment`
+      `[Lumberjack] Injected ${commitEnvVar}=${commitSha} into environment`
     );
   }
 
@@ -420,7 +420,7 @@ export function withTreebeardConfig(
         commitSha
       ) {
         if (debug) {
-          console.log("[Treebeard] Adding sourcemap upload to webpack build");
+          console.log("[Lumberjack] Adding sourcemap upload to webpack build");
         }
 
         // Add a plugin to upload sourcemaps after build
@@ -443,7 +443,7 @@ export function withTreebeardConfig(
     // if (uploadSourceMaps && validatedServiceToken && commitSha) {
     //   if (debug) {
     //     console.log(
-    //       "[Treebeard] Turbopack detected, setting up post-build sourcemap upload"
+    //       "[Lumberjack] Turbopack detected, setting up post-build sourcemap upload"
     //     );
     //   }
     //   // Store upload configuration for later use
@@ -463,14 +463,14 @@ export function withTreebeardConfig(
     //       try {
     //         if (debug) {
     //           console.log(
-    //             "[Treebeard] Production build ending, uploading sourcemaps..."
+    //             "[Lumberjack] Production build ending, uploading sourcemaps..."
     //           );
     //         }
     //         await uploadSourceMapsImpl(uploadConfig);
     //       } catch (error) {
     //         if (debug) {
     //           console.error(
-    //             "[Treebeard] Post-build sourcemap upload failed:",
+    //             "[Lumberjack] Post-build sourcemap upload failed:",
     //             error
     //           );
     //         }
@@ -481,17 +481,17 @@ export function withTreebeardConfig(
     //     process.on("exit", () => {
     //       // For synchronous cleanup, we can't await here
     //       if (debug) {
-    //         console.log("[Treebeard] Production build process exiting");
+    //         console.log("[Lumberjack] Production build process exiting");
     //       }
     //     });
     //   } else if (debug) {
     //     console.log(
-    //       "[Treebeard] Turbopack dev mode - skipping sourcemap upload setup"
+    //       "[Lumberjack] Turbopack dev mode - skipping sourcemap upload setup"
     //     );
     //   }
     // } else if (debug) {
     //   console.log(
-    //     "[Treebeard] Turbopack detected, but sourcemap upload not configured"
+    //     "[Lumberjack] Turbopack detected, but sourcemap upload not configured"
     //   );
     // }
   }
@@ -505,7 +505,7 @@ export function withTreebeardConfig(
 class SourceMapUploadPlugin {
   private options: Required<
     Pick<
-      TreebeardConfigOptions,
+      LumberjackConfigOptions,
       "serviceToken" | "uploadUrl" | "project" | "commit" | "debug"
     >
   >;
@@ -513,7 +513,7 @@ class SourceMapUploadPlugin {
   constructor(
     options: Required<
       Pick<
-        TreebeardConfigOptions,
+        LumberjackConfigOptions,
         "serviceToken" | "uploadUrl" | "project" | "commit" | "debug"
       >
     >
@@ -528,7 +528,7 @@ class SourceMapUploadPlugin {
         try {
           if (this.options.debug) {
             console.log(
-              "[Treebeard] Build completed, uploading sourcemaps...",
+              "[Lumberjack] Build completed, uploading sourcemaps...",
               this.options
             );
           }
@@ -536,10 +536,10 @@ class SourceMapUploadPlugin {
           await uploadSourceMapsImpl(this.options);
 
           if (this.options.debug) {
-            console.log("[Treebeard] Sourcemap upload completed");
+            console.log("[Lumberjack] Sourcemap upload completed");
           }
         } catch (error) {
-          console.error("[Treebeard] Sourcemap upload failed:", error);
+          console.error("[Lumberjack] Sourcemap upload failed:", error);
           // Don't fail the build, just log the error
         }
 

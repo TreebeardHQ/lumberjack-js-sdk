@@ -1,6 +1,6 @@
-import type { RegisteredObject } from "./object-batch.js";
-import type { EnrichedSpanRequest } from "./span-types.js";
-import type { LogEntry } from "./types.js";
+import type { RegisteredObject } from "./object-batch";
+import type { EnrichedSpanRequest } from "./span-types";
+import type { LogEntry } from "./types";
 
 export interface ExportResult {
   success: boolean;

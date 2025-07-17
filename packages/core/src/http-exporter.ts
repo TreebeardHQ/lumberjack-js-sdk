@@ -5,8 +5,8 @@ import type {
   Exporter,
   ExporterConfig,
   ExportResult,
-} from "./exporter.js";
-import type { LogEntryForAPI } from "./types.js";
+} from "./exporter";
+import type { LogEntryForAPI } from "./types";
 
 export class HttpExporter implements Exporter {
   private readonly config: ExporterConfig;
@@ -17,7 +17,7 @@ export class HttpExporter implements Exporter {
   constructor(config: ExporterConfig) {
     this.config = config;
     const baseEndpoint =
-      config.endpoint || "https://api.treebeardhq.com/logs/batch";
+      config.endpoint || "https://api.trylumberjack.com/logs/batch";
     this.logsEndpoint = baseEndpoint;
     this.objectsEndpoint = baseEndpoint.replace(
       "/logs/batch",
@@ -34,9 +34,9 @@ export class HttpExporter implements Exporter {
     if (!this.config.apiKey) {
       // Output to console when no API key is provided (backward compatibility)
       console.warn(
-        "[Treebeard]: No API key provided - logs will be output to console"
+        "[Lumberjack]: No API key provided - logs will be output to console"
       );
-      logs.forEach((log) => console.log("[Treebeard]", JSON.stringify(log)));
+      logs.forEach((log) => console.log("[Lumberjack]", JSON.stringify(log)));
       return { success: true, itemsExported: logs.length };
     }
 
@@ -101,7 +101,7 @@ export class HttpExporter implements Exporter {
   ): Promise<ExportResult> {
     if (objects.length === 0) {
       if (this.config.debug) {
-        console.debug("[Treebeard] No objects to export");
+        console.debug("[Lumberjack] No objects to export");
       }
       return { success: true, itemsExported: 0 };
     }
@@ -110,7 +110,7 @@ export class HttpExporter implements Exporter {
       // Skip object registration when no API key is provided (backward compatibility)
       if (this.config.debug) {
         console.debug(
-          "[Treebeard] No API key provided - objects will be output to console"
+          "[Lumberjack] No API key provided - objects will be output to console"
         );
       }
 
@@ -165,7 +165,7 @@ export class HttpExporter implements Exporter {
   async exportSpans(spanRequest: EnrichedSpanRequest): Promise<ExportResult> {
     if (!spanRequest.resourceSpans || spanRequest.resourceSpans.length === 0) {
       if (this.config.debug) {
-        console.debug("[Treebeard] No spans to export");
+        console.debug("[Lumberjack] No spans to export");
       }
       return { success: true, itemsExported: 0 };
     }
@@ -173,9 +173,9 @@ export class HttpExporter implements Exporter {
     if (!this.config.apiKey) {
       // Output spans to console when no API key is provided (backward compatibility)
       console.warn(
-        "[Treebeard]: No API key provided - spans will be output to console"
+        "[Lumberjack]: No API key provided - spans will be output to console"
       );
-      console.log("[Treebeard] Spans:", JSON.stringify(spanRequest, null, 2));
+      console.log("[Lumberjack] Spans:", JSON.stringify(spanRequest, null, 2));
       return { success: true, itemsExported: spanRequest.resourceSpans.length };
     }
 

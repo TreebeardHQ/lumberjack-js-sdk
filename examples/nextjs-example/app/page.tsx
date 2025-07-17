@@ -1,9 +1,9 @@
-import ServerComponent from './server-component';
+import ServerComponent from "./server-component";
 
 export default function Home() {
   return (
     <div>
-      <h1>Treebeard Next.js Example</h1>
+      <h1>Lumberjack Next.js Example</h1>
       <ServerComponent />
       <div>
         <h2>Client Component</h2>

@@ -1,8 +1,8 @@
 import { AsyncLocalStorage } from "async_hooks";
 import { randomBytes } from "node:crypto";
-import { TraceContext } from "./types.js";
+import { TraceContext } from "./types";
 
-class TreebeardContext {
+class LumberjackContext {
   private static asyncLocalStorage = new AsyncLocalStorage<TraceContext>();
 
   static run<T>(store: TraceContext, callback: () => T): T {
@@ -64,4 +64,4 @@ class TreebeardContext {
   }
 }
 
-export { TreebeardContext };
+export { LumberjackContext };

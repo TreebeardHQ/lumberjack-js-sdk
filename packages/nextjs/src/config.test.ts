@@ -198,7 +198,7 @@ describe("Source Map Upload", () => {
       findSourceMapFiles(true);
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "[Treebeard] Found sourcemap files:",
+        "[Lumberjack] Found sourcemap files:",
         1
       );
 
@@ -206,15 +206,15 @@ describe("Source Map Upload", () => {
     });
   });
 
-  describe("withTreebeardConfig webpack integration", () => {
+  describe("withLumberjackConfig webpack integration", () => {
     it("should enable server-side source maps in production", async () => {
-      const { withTreebeardConfig } = await import("./config");
+      const { withLumberjackConfig } = await import("./config");
 
       const mockWebpackConfig = {
         devtool: undefined,
       };
 
-      const nextConfig = withTreebeardConfig(
+      const nextConfig = withLumberjackConfig(
         {},
         {
           serviceToken: "test-token",
@@ -238,13 +238,13 @@ describe("Source Map Upload", () => {
     });
 
     it("should not modify devtool for client builds", async () => {
-      const { withTreebeardConfig } = await import("./config");
+      const { withLumberjackConfig } = await import("./config");
 
       const mockWebpackConfig = {
         devtool: "eval-source-map",
       };
 
-      const nextConfig = withTreebeardConfig(
+      const nextConfig = withLumberjackConfig(
         {},
         {
           serviceToken: "test-token",
@@ -266,13 +266,13 @@ describe("Source Map Upload", () => {
     });
 
     it("should not modify devtool in development", async () => {
-      const { withTreebeardConfig } = await import("./config");
+      const { withLumberjackConfig } = await import("./config");
 
       const mockWebpackConfig = {
         devtool: "eval",
       };
 
-      const nextConfig = withTreebeardConfig(
+      const nextConfig = withLumberjackConfig(
         {},
         {
           serviceToken: "test-token",

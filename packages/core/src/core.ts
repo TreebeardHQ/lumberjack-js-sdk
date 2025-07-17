@@ -4,26 +4,26 @@ import { NodeSDK } from "@opentelemetry/sdk-node";
 import { ReadableSpan } from "@opentelemetry/sdk-trace-node";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import { EventEmitter } from "events";
-import { TreebeardContext } from "./context.js";
-import { getCommitSha, getEnvironmentInfo } from "./environment.js";
+import { LumberjackContext } from "./context";
+import { getCommitSha, getEnvironmentInfo } from "./environment";
 import type {
   EnrichedLogEntry,
   EnrichedRegisteredObject,
   Exporter,
-} from "./exporter.js";
-import { Gatekeeper } from "./gatekeeper.js";
-import { HttpExporter } from "./http-exporter.js";
-import { ObjectBatch, RegisteredObject } from "./object-batch.js";
-import { detectRuntime, getEnvironmentValue } from "./runtime.js";
-import { convertReadableSpansToOTLP, SpanBatch } from "./span-batch.js";
-import { TreebeardSpanProcessor } from "./span-processor.js";
-import { LogEntry, LogLevelType, TreebeardConfig } from "./types.js";
-import { getCallerInfo } from "./util/get-caller-info.js";
+} from "./exporter";
+import { Gatekeeper } from "./gatekeeper";
+import { HttpExporter } from "./http-exporter";
+import { ObjectBatch, RegisteredObject } from "./object-batch";
+import { detectRuntime, getEnvironmentValue } from "./runtime";
+import { convertReadableSpansToOTLP, SpanBatch } from "./span-batch";
+import { LumberjackSpanProcessor } from "./span-processor";
+import { LogEntry, LogLevelType, LumberjackConfig } from "./types";
+import { getCallerInfo } from "./util/get-caller-info";
 
-export class TreebeardCore extends EventEmitter {
-  private static instance: TreebeardCore | null = null;
+export class LumberjackCore extends EventEmitter {
+  private static instance: LumberjackCore | null = null;
 
-  private config!: Required<Omit<TreebeardConfig, "exporter">> & {
+  private config!: Required<Omit<LumberjackConfig, "exporter">> & {
     exporter?: Exporter | undefined;
   };
   private logBuffer: LogEntry[] = [];
@@ -37,44 +37,44 @@ export class TreebeardCore extends EventEmitter {
   private _gatekeeper: Gatekeeper | null = null;
   private exporter!: Exporter;
 
-  constructor(config: TreebeardConfig = {}) {
+  constructor(config: LumberjackConfig = {}) {
     super();
 
-    if (TreebeardCore.instance) {
-      return TreebeardCore.instance;
+    if (LumberjackCore.instance) {
+      return LumberjackCore.instance;
     }
 
     this.config = {
-      apiKey: config.apiKey || getEnvironmentValue("TREEBEARD_API_KEY") || "",
+      apiKey: config.apiKey || getEnvironmentValue("LUMBERJACK_API_KEY") || "",
       endpoint:
         config.endpoint ||
-        getEnvironmentValue("TREEBEARD_ENDPOINT") ||
-        "https://api.treebeardhq.com/logs/batch",
+        getEnvironmentValue("LUMBERJACK_ENDPOINT") ||
+        "https://api.trylumberjack.com/logs/batch",
       projectName: config.projectName || "js-app",
       batchSize: config.batchSize || 100,
       batchAge: config.batchAge || 5000,
       flushInterval: config.flushInterval || 30000,
-      captureConsole: config.captureConsole || false,
+      captureConsole: config.captureConsole || true,
       captureUnhandled: config.captureUnhandled !== false,
       debug: config.debug || false,
       serviceToken:
         config.serviceToken ||
-        getEnvironmentValue("TREEBEARD_SERVICE_TOKEN") ||
+        getEnvironmentValue("LUMBERJACK_SERVICE_TOKEN") ||
         "",
       gatekeeperEndpoint:
         config.gatekeeperEndpoint ||
-        getEnvironmentValue("TREEBEARD_GATEKEEPER_ENDPOINT") ||
-        "https://api.treebeardhq.com/gatekeeper",
+        getEnvironmentValue("LUMBERJACK_GATEKEEPER_ENDPOINT") ||
+        "https://api.trylumberjack.com/gatekeeper",
       exporter: config.exporter || undefined,
     };
 
     if (this.config.debug) {
       const envInfo = getEnvironmentInfo();
-      console.log("[Treebeard] Initializing SDK with config:", {
+      console.log("[Lumberjack] Initializing SDK with config:", {
         ...this.config,
         apiKey: this.config.apiKey ? "[REDACTED]" : "none",
       });
-      console.log("[Treebeard] Environment context:", envInfo);
+      console.log("[Lumberjack] Environment context:", envInfo);
     }
 
     // Initialize exporter - use provided exporter or create default HttpExporter
@@ -99,14 +99,14 @@ export class TreebeardCore extends EventEmitter {
       this.enableConsoleCapture();
     }
 
-    TreebeardCore.instance = this;
+    LumberjackCore.instance = this;
 
     // set up and start the sdk
     const sdk = new NodeSDK({
       resource: Resources.resourceFromAttributes({
         [ATTR_SERVICE_NAME]: this.config.projectName,
       }),
-      spanProcessor: new TreebeardSpanProcessor({
+      spanProcessor: new LumberjackSpanProcessor({
         debug: this.config.debug,
         instance: this,
       }),
@@ -115,12 +115,12 @@ export class TreebeardCore extends EventEmitter {
     sdk.start();
   }
 
-  static init(config?: TreebeardConfig): TreebeardCore {
-    return new TreebeardCore(config);
+  static init(config?: LumberjackConfig): LumberjackCore {
+    return new LumberjackCore(config);
   }
 
-  static getInstance(): TreebeardCore | null {
-    return TreebeardCore.instance;
+  static getInstance(): LumberjackCore | null {
+    return LumberjackCore.instance;
   }
 
   addSpan(span: ReadableSpan): void {
@@ -133,7 +133,7 @@ export class TreebeardCore extends EventEmitter {
 
   private enableConsoleCapture(): void {
     if (this.config.debug) {
-      console.log("[Treebeard] Enabling console capture");
+      console.log("[Lumberjack] Enabling console capture");
     }
 
     const levels = ["log", "info", "warn", "error", "debug"] as const;
@@ -152,7 +152,7 @@ export class TreebeardCore extends EventEmitter {
         }
 
         // don't infinite loop
-        if (message.includes("[Treebeard]")) {
+        if (message.includes("[Lumberjack]")) {
           return;
         }
         let attributes: any[] = [];
@@ -207,7 +207,7 @@ export class TreebeardCore extends EventEmitter {
 
   private disableConsoleCapture(): void {
     if (this.config.debug) {
-      console.log("[Treebeard] Disabling console capture");
+      console.log("[Lumberjack] Disabling console capture");
     }
 
     Object.keys(this.originalConsoleMethods).forEach((level) => {
@@ -224,7 +224,7 @@ export class TreebeardCore extends EventEmitter {
   ): void {
     if (this.isShuttingDown) return;
 
-    const context = TreebeardContext.getStore();
+    const context = LumberjackContext.getStore();
     const callerInfo = caller || getCallerInfo(3); // fallback with deeper skip
 
     const currentSpan = trace.getActiveSpan();
@@ -246,7 +246,7 @@ export class TreebeardCore extends EventEmitter {
         context?.traceId ||
         undefined,
       spanId: traceContext.spanId || context?.spanId || undefined,
-      source: metadata.source || "treebeard-js",
+      source: metadata.source || "lumberjack-js",
       ...callerInfo,
       props: {
         ...metadata,
@@ -255,7 +255,7 @@ export class TreebeardCore extends EventEmitter {
     };
 
     if (this.config.debug) {
-      console.log("[Treebeard] Adding log entry to buffer:", logEntry);
+      console.log("[Lumberjack] Adding log entry to buffer:", logEntry);
     }
 
     this.logBuffer.push(logEntry);
@@ -263,7 +263,7 @@ export class TreebeardCore extends EventEmitter {
     if (this.logBuffer.length >= this.config.batchSize) {
       if (this.config.debug) {
         console.log(
-          `[Treebeard] Buffer full (${this.logBuffer.length}/${this.config.batchSize}), triggering flush`
+          `[Lumberjack] Buffer full (${this.logBuffer.length}/${this.config.batchSize}), triggering flush`
         );
       }
       this.flush();
@@ -325,7 +325,7 @@ export class TreebeardCore extends EventEmitter {
 
     if (!obj) {
       if (this.config.debug) {
-        console.warn("[Treebeard] No object provided for registration");
+        console.warn("[Lumberjack] No object provided for registration");
       }
       return;
     }
@@ -365,7 +365,7 @@ export class TreebeardCore extends EventEmitter {
   }
 
   static register(obj?: any): void {
-    const instance = TreebeardCore.getInstance();
+    const instance = LumberjackCore.getInstance();
     if (instance) {
       instance.registerObject(obj);
     }
@@ -398,14 +398,14 @@ export class TreebeardCore extends EventEmitter {
     // Convert object to dict if needed
     if (typeof objData !== "object" || objData === null) {
       if (this.config.debug) {
-        console.warn("[Treebeard] Cannot register non-object data");
+        console.warn("[Lumberjack] Cannot register non-object data");
       }
       return null;
     }
 
     if (Array.isArray(objData)) {
       if (this.config.debug) {
-        console.warn("[Treebeard] Cannot register array directly");
+        console.warn("[Lumberjack] Cannot register array directly");
       }
       return null;
     }
@@ -422,7 +422,7 @@ export class TreebeardCore extends EventEmitter {
     if (!objDict.id) {
       if (this.config.debug) {
         console.warn(
-          "[Treebeard] Object registered without 'id' field. This may cause issues with object tracking."
+          "[Lumberjack] Object registered without 'id' field. This may cause issues with object tracking."
         );
       }
       return null;
@@ -507,7 +507,7 @@ export class TreebeardCore extends EventEmitter {
     if (cachedChecksum === checksum) {
       if (this.config.debug) {
         console.log(
-          `[Treebeard] Object ${objId} unchanged (checksum: ${checksum.substring(
+          `[Lumberjack] Object ${objId} unchanged (checksum: ${checksum.substring(
             0,
             8
           )}...), skipping registration`
@@ -521,7 +521,7 @@ export class TreebeardCore extends EventEmitter {
 
     if (this.config.debug) {
       console.log(
-        `[Treebeard] Object ${objId} ${
+        `[Lumberjack] Object ${objId} ${
           cachedChecksum ? "changed" : "new"
         } (checksum: ${checksum.substring(0, 8)}...), will register`
       );
@@ -569,17 +569,17 @@ export class TreebeardCore extends EventEmitter {
       const contextKey = `${objectName}_id`;
 
       // Set the context value to the object's ID
-      const context = TreebeardContext.getStore();
+      const context = LumberjackContext.getStore();
       if (context) {
         const newContext = { ...context, [contextKey]: objectId };
-        TreebeardContext.run(newContext, () => {
+        LumberjackContext.run(newContext, () => {
           // Context is now updated with object ID
         });
       }
 
       if (this.config.debug) {
         console.log(
-          `[Treebeard] Attached object to context: ${contextKey} = ${objectId}`
+          `[Lumberjack] Attached object to context: ${contextKey} = ${objectId}`
         );
       }
     }
@@ -588,7 +588,7 @@ export class TreebeardCore extends EventEmitter {
   flushSpans(): number {
     if (!this.spanBatch) {
       if (this.config.debug) {
-        console.log("[Treebeard] Span batch not initialized");
+        console.log("[Lumberjack] Span batch not initialized");
       }
       return 0;
     }
@@ -597,7 +597,7 @@ export class TreebeardCore extends EventEmitter {
     const count = spans.length;
     if (spans.length > 0) {
       this.sendSpans(spans).catch((error) => {
-        console.error("[Treebeard]: Error in flushSpans:", error);
+        console.error("[Lumberjack]: Error in flushSpans:", error);
       });
     }
 
@@ -616,7 +616,7 @@ export class TreebeardCore extends EventEmitter {
 
     if (!result.success) {
       console.error(
-        "[Treebeard]: Failed to send spans:",
+        "[Lumberjack]: Failed to send spans:",
         result.error?.message
       );
     }
@@ -625,7 +625,7 @@ export class TreebeardCore extends EventEmitter {
   flushObjects(): number {
     if (!this.objectBatch) {
       if (this.config.debug) {
-        console.log("[Treebeard] Object batch not initialized");
+        console.log("[Lumberjack] Object batch not initialized");
       }
       return 0;
     }
@@ -635,7 +635,7 @@ export class TreebeardCore extends EventEmitter {
     if (objects.length > 0) {
       // Fire and forget - don't await to maintain non-blocking behavior
       this.sendObjects(objects).catch((error) => {
-        console.error("[Treebeard]: Error in flushObjects:", error);
+        console.error("[Lumberjack]: Error in flushObjects:", error);
       });
     }
 
@@ -660,19 +660,19 @@ export class TreebeardCore extends EventEmitter {
     );
 
     if (this.config.debug) {
-      console.log(`[Treebeard] Sending ${objects.length} objects`);
+      console.log(`[Lumberjack] Sending ${objects.length} objects`);
     }
 
     const result = await this.exporter.exportObjects(transformedObjects);
 
     if (!result.success) {
       console.error(
-        "[Treebeard]: Failed to send objects:",
+        "[Lumberjack]: Failed to send objects:",
         result.error?.message
       );
     } else if (this.config.debug) {
       console.log(
-        `[Treebeard] Successfully sent ${result.itemsExported} objects`
+        `[Lumberjack] Successfully sent ${result.itemsExported} objects`
       );
     }
   }
@@ -685,7 +685,7 @@ export class TreebeardCore extends EventEmitter {
     const runtime = detectRuntime();
 
     if (this.config.debug) {
-      console.log(`[Treebeard] Setting up flush timer for runtime:`, runtime);
+      console.log(`[Lumberjack] Setting up flush timer for runtime:`, runtime);
     }
 
     // Only set up intervals in Node.js environment
@@ -693,20 +693,20 @@ export class TreebeardCore extends EventEmitter {
     if (runtime.isNode || runtime.isBrowser) {
       this.flushTimer = setInterval(() => {
         if (this.config.debug) {
-          console.log("[Treebeard] Auto-flush triggered by timer");
+          console.log("[Lumberjack] Auto-flush triggered by timer");
         }
         this.flush();
       }, this.config.flushInterval);
 
       if (this.config.debug) {
         console.log(
-          `[Treebeard] Flush timer started with interval: ${this.config.flushInterval}ms`
+          `[Lumberjack] Flush timer started with interval: ${this.config.flushInterval}ms`
         );
       }
     } else {
       if (this.config.debug) {
         console.log(
-          "[Treebeard] Skipping flush timer setup (not supported in this runtime)"
+          "[Lumberjack] Skipping flush timer setup (not supported in this runtime)"
         );
       }
     }
@@ -721,7 +721,7 @@ export class TreebeardCore extends EventEmitter {
   async flush(): Promise<void> {
     if (this.logBuffer.length === 0) {
       if (this.config.debug) {
-        console.log("[Treebeard] Flush called but buffer is empty");
+        console.log("[Lumberjack] Flush called but buffer is empty");
       }
       return;
     }
@@ -730,7 +730,7 @@ export class TreebeardCore extends EventEmitter {
     this.logBuffer = [];
 
     if (this.config.debug) {
-      console.log(`[Treebeard] Flushing ${logs.length} log entries`);
+      console.log(`[Lumberjack] Flushing ${logs.length} log entries`);
     }
 
     const commitSha = getCommitSha();
@@ -760,18 +760,23 @@ export class TreebeardCore extends EventEmitter {
     const result = await this.exporter.exportLogs(transformedLogs);
 
     if (!result.success) {
-      console.error("[Treebeard]: Failed to send logs:", result.error?.message);
+      console.error(
+        "[Lumberjack]: Failed to send logs:",
+        result.error?.message
+      );
       if (this.config.debug) {
-        console.log("[Treebeard] Re-queuing logs due to error");
+        console.log("[Lumberjack] Re-queuing logs due to error");
       }
       // Re-queue logs on failure
       this.logBuffer.unshift(...logs);
     } else if (this.config.debug) {
-      console.log(`[Treebeard] Successfully sent ${result.itemsExported} logs`);
+      console.log(
+        `[Lumberjack] Successfully sent ${result.itemsExported} logs`
+      );
     }
   }
 
-  getConfig(): Required<Omit<TreebeardConfig, "exporter">> & {
+  getConfig(): Required<Omit<LumberjackConfig, "exporter">> & {
     exporter?: Exporter | undefined;
   } {
     return this.config;
@@ -786,7 +791,7 @@ export class TreebeardCore extends EventEmitter {
 
   async shutdown(): Promise<void> {
     if (this.config.debug) {
-      console.log("[Treebeard] Shutting down SDK");
+      console.log("[Lumberjack] Shutting down SDK");
     }
 
     this.isShuttingDown = true;
@@ -803,6 +808,6 @@ export class TreebeardCore extends EventEmitter {
     // Clear object cache
     this.objectCache.clear();
 
-    TreebeardCore.instance = null;
+    LumberjackCore.instance = null;
   }
 }

@@ -1,3 +1,5 @@
+import type { Exporter } from "./exporter";
+
 export interface LogLevel {
   TRACE: "trace";
   DEBUG: "debug";
@@ -49,9 +51,7 @@ export interface LogEntryForAPI {
   fn?: string | undefined;
 }
 
-import type { Exporter } from "./exporter.js";
-
-export interface TreebeardConfig {
+export interface LumberjackConfig {
   apiKey?: string;
   endpoint?: string;
   projectName?: string;
