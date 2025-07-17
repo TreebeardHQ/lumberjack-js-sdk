@@ -52,7 +52,7 @@ export type {
 } from "./types.js";
 
 import { LumberjackCore } from "./core.js";
-import { getCallerInfo } from "./util/get-caller-info.js";
+import { CallerInfo, getCallerInfo } from "./util/get-caller-info.js";
 
 export const log = {
   trace: (message: string, metadata?: Record<string, any>) => {
@@ -83,8 +83,12 @@ export const log = {
       instance.log("warn", message, metadata || {}, caller);
     }
   },
-  error: (message: string, metadata?: Record<string, any>) => {
-    const caller = getCallerInfo(1); // Skip this arrow function to get the actual caller
+  error: (
+    message: string,
+    metadata?: Record<string, any>,
+    callerInfo?: CallerInfo
+  ) => {
+    const caller = callerInfo || getCallerInfo(1); // Skip this arrow function to get the actual caller
     const instance = LumberjackCore.getInstance();
     if (instance) {
       instance.log("error", message, metadata || {}, caller);

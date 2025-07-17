@@ -1,4 +1,5 @@
 import { LumberjackCore, log } from "@lumberjack-sdk/core";
+import { getCallerInfo } from "@lumberjack-sdk/core/dist/util/get-caller-info";
 import { trace } from "@opentelemetry/api";
 import { type Instrumentation } from "next";
 // extend Instrumentation.onRequestError add additioanml optons param:
@@ -31,13 +32,19 @@ export const onRequestError: Instrumentation.onRequestError = async (
     };
   }
 
-  log.error(message, {
-    exception,
-    request,
-    traceId,
-    spanId,
-    ...context,
-  });
+  const caller = getCallerInfo(1);
+
+  log.error(
+    message,
+    {
+      exception,
+      request,
+      traceId,
+      spanId,
+      ...context,
+    },
+    caller
+  );
 
   // flush errors
   return await LumberjackCore.getInstance()?.flush();

@@ -1,6 +1,6 @@
 {
   "name": "@lumberjack-sdk/nextjs",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "description": "Next.js integration for Lumberjack logging and tracing",
   "type": "module",
   "main": "dist/index.js",

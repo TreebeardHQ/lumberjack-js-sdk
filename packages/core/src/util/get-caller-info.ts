@@ -1,12 +1,15 @@
 // caller.ts --------------------------------------------------------------
 type CallSite = NodeJS.CallSite;
-/** Return caller info N frames above this helper (skip=0 → immediate caller). */
-export function getCallerInfo(skip = 0): {
+
+export type CallerInfo = {
   file?: string | undefined;
   line?: number | undefined;
   column?: number | undefined;
   func?: string | undefined;
-} {
+};
+
+/** Return caller info N frames above this helper (skip=0 → immediate caller). */
+export function getCallerInfo(skip = 0): CallerInfo {
   const err = new Error();
 
   // Ask V8 for structured stack frames

@@ -249,6 +249,7 @@ export class LumberjackCore extends EventEmitter {
       source: metadata.source || "lumberjack-js",
       ...callerInfo,
       props: {
+        ...callerInfo,
         ...metadata,
       },
       exception: metadata.exception,
