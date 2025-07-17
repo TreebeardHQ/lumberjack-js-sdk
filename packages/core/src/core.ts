@@ -328,6 +328,8 @@ export class LumberjackCore extends EventEmitter {
         console.warn("[Lumberjack] No object provided for registration");
       }
       return;
+    } else if (this.config.debug) {
+      console.log("[Lumberjack] Registering object:", obj);
     }
 
     // Check if obj is a record (plain object) where keys should be used as names
@@ -335,6 +337,9 @@ export class LumberjackCore extends EventEmitter {
       // Handle record registration - register each key-value pair
       for (const [key, value] of Object.entries(obj)) {
         const formattedObj = this.formatObject(value, key);
+        if (this.config.debug) {
+          console.log("[Lumberjack] Formatted object:", formattedObj);
+        }
         if (formattedObj) {
           // Always attach to context regardless of cache status
           this.attachToContext(formattedObj);
