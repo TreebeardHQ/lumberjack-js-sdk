@@ -566,15 +566,12 @@ export class LumberjackCore extends EventEmitter {
 
     if (objectName && objectId) {
       // Create context key as {name}_id
-      const contextKey = `${objectName}_id`;
+      const contextKey = `lb_register.${objectName}_id`;
 
       // Set the context value to the object's ID
-      const context = LumberjackContext.getStore();
-      if (context) {
-        const newContext = { ...context, [contextKey]: objectId };
-        LumberjackContext.run(newContext, () => {
-          // Context is now updated with object ID
-        });
+      const currentSpan = trace.getActiveSpan();
+      if (currentSpan) {
+        currentSpan.setAttribute(contextKey, objectId);
       }
 
       if (this.config.debug) {

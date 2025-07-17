@@ -28,6 +28,7 @@ export class LumberjackSpanProcessor implements SpanProcessor {
     if (span.attributes["next.span_type"] === "BaseServer.handleRequest") {
       // Always collect the span for export
       this.instance.addSpan(span);
+
       if (this.options.debug) {
         console.debug("[Lumberjack] Collected span:", span.name, {
           traceId: span.spanContext().traceId,
@@ -36,6 +37,7 @@ export class LumberjackSpanProcessor implements SpanProcessor {
           kind: span.kind,
           status: span.status,
           duration: span.duration,
+          attributes: span.attributes,
         });
       }
     }
