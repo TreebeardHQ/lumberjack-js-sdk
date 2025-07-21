@@ -54,6 +54,10 @@ export type {
 import { LumberjackCore } from "./core.js";
 import { CallerInfo, getCallerInfo } from "./util/get-caller-info.js";
 
+export const utils = {
+  getCallerInfo,
+};
+
 export const log = {
   trace: (message: string, metadata?: Record<string, any>) => {
     const caller = getCallerInfo(1); // Skip this arrow function to get the actual caller

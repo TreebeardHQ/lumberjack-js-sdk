@@ -1,5 +1,4 @@
-import { LumberjackCore, log } from "@lumberjack-sdk/core";
-import { getCallerInfo } from "@lumberjack-sdk/core/dist/util/get-caller-info";
+import { LumberjackCore, log, utils } from "@lumberjack-sdk/core";
 import { trace } from "@opentelemetry/api";
 import { type Instrumentation } from "next";
 // extend Instrumentation.onRequestError add additioanml optons param:
@@ -32,7 +31,7 @@ export const onRequestError: Instrumentation.onRequestError = async (
     };
   }
 
-  const caller = getCallerInfo(1);
+  const caller = utils.getCallerInfo(1);
 
   log.error(
     message,

@@ -20,6 +20,13 @@ import { LumberjackSpanProcessor } from "./span-processor.js";
 import { LogEntry, LogLevelType, LumberjackConfig } from "./types.js";
 import { getCallerInfo } from "./util/get-caller-info.js";
 
+declare global {
+  // Each Node.js worker (and each Next.js page/API worker) gets its own global object,
+  // so this is “safe” and survives hot-reload in dev.
+  // The `undefined` union prevents “duplicate identifier” errors on re-compiles.
+  var __LUMBERJACK_CORE__: LumberjackCore | undefined;
+}
+
 export class LumberjackCore extends EventEmitter {
   private static instance: LumberjackCore | null = null;
 
@@ -115,12 +122,26 @@ export class LumberjackCore extends EventEmitter {
     sdk.start();
   }
 
+  /** Initialise (or return) the singleton */
   static init(config?: LumberjackConfig): LumberjackCore {
-    return new LumberjackCore(config);
+    // 1. Re-use the instance if it already exists (dev-mode friendly).
+    if (globalThis.__LUMBERJACK_CORE__) {
+      return globalThis.__LUMBERJACK_CORE__;
+    }
+
+    // 2. Create a fresh instance – the constructor already handles
+    //    “return the existing one” logic if someone called `new` directly.
+    const core = new LumberjackCore(config);
+
+    // 3. Expose it on globalThis so every module in this worker sees the same object.
+    globalThis.__LUMBERJACK_CORE__ = core;
+
+    return core;
   }
 
-  static getInstance(): LumberjackCore | null {
-    return LumberjackCore.instance;
+  /** Read-only accessor that never re-creates the core */
+  static getInstance(): LumberjackCore | undefined {
+    return globalThis.__LUMBERJACK_CORE__;
   }
 
   addSpan(span: ReadableSpan): void {
@@ -371,9 +392,9 @@ export class LumberjackCore extends EventEmitter {
   }
 
   static register(obj?: any): void {
-    // TODO
     const instance = LumberjackCore.getInstance();
     if (instance) {
+      console.log("found instance", obj);
       instance.registerObject(obj);
     } else {
       const currentSpan = trace.getActiveSpan();

@@ -1,6 +1,6 @@
 {
   "name": "@lumberjack-sdk/core",
-  "version": "0.7.6",
+  "version": "0.7.12",
   "description": "Core JavaScript/TypeScript SDK for Lumberjack logging and tracing",
   "type": "module",
   "private": false,
