@@ -1,4 +1,4 @@
-import ServerComponent from "./server-component.js";
+import ServerComponent from "./server-component";
 
 export default function Home() {
   return (

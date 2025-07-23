@@ -351,8 +351,6 @@ export function withLumberjackConfig(
     debug = configDebug ?? false,
   } = lumberjackOptions;
 
-  const commitEnvVar = "LUMBERJACK_COMMIT_SHA";
-
   // Validate service token
   const validatedServiceToken = validateServiceToken(serviceToken, debug);
 
@@ -381,7 +379,7 @@ export function withLumberjackConfig(
   if (commitSha) {
     env["LUMBERJACK_COMMIT_SHA"] = commitSha;
     console.log(
-      `[Lumberjack] Injected ${commitEnvVar}=${commitSha} into environment`
+      `[Lumberjack] Injected LUMBERJACK_COMMIT_SHA=${commitSha} into environment`
     );
   }
 
