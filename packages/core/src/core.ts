@@ -394,15 +394,7 @@ export class LumberjackCore extends EventEmitter {
   static register(obj?: any): void {
     const instance = LumberjackCore.getInstance();
     if (instance) {
-      console.log("found instance", obj);
       instance.registerObject(obj);
-    } else {
-      const currentSpan = trace.getActiveSpan();
-
-      console.warn(
-        "[Lumberjack] No instance found, skipping registration, current span",
-        currentSpan
-      );
     }
   }
 
