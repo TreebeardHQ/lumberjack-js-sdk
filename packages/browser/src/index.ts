@@ -9,10 +9,19 @@ import { SessionManager } from "./session";
 import { EventBuffer } from "./buffer";
 import { ErrorTracker } from "./error-tracker";
 import { SessionReplay } from "./session-replay";
-import { HttpExporter, ConsoleExporter } from "./exporter";
+import { HttpExporter } from "./exporter";
 
 class LumberjackSDK {
-  private config: Required<FrontendConfig>;
+  private config: FrontendConfig & {
+    endpoint: string;
+    bufferSize: number;
+    flushInterval: number;
+    enableSessionReplay: boolean;
+    replayPrivacyMode: "strict" | "standard";
+    blockSelectors: string[];
+    errorSampleRate: number;
+    replaySampleRate: number;
+  };
   private sessionManager: SessionManager;
   private buffer: EventBuffer;
   private errorTracker: ErrorTracker;
@@ -215,8 +224,8 @@ class LumberjackSDK {
       sessionId: session.id,
       data: {
         message: error.message,
-        stack: error.stack,
-        type: "error",
+        stack: error.stack || '',
+        type: "error" as const,
         ...context,
       },
     });
