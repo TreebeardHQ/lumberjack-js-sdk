@@ -1,0 +1,47 @@
+{
+  "name": "@lumberjack-sdk/browser",
+  "version": "0.1.0",
+  "description": "Browser error tracking, custom events, and session replay for Lumberjack",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "dev": "tsup src/index.ts --format esm,cjs --dts --watch",
+    "clean": "rm -rf dist",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "rrweb": "^2.0.0-alpha.11"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "browser",
+    "error-tracking",
+    "session-replay",
+    "observability",
+    "monitoring",
+    "lumberjack"
+  ],
+  "author": "Treebeard",
+  "license": "MIT"
+}
