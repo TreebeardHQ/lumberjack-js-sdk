@@ -10,6 +10,30 @@ function Home() {
     alert('Custom event tracked!');
   };
 
+  const showSessionInfo = () => {
+    const session = lumberjack.getSession();
+    const sessionId = lumberjack.getSessionId();
+    const isRecording = lumberjack.isRecording();
+    const user = lumberjack.getUser();
+    const duration = lumberjack.getSessionDuration();
+    const remaining = lumberjack.getSessionRemainingTime();
+
+    const formatDuration = (ms: number) => {
+      const minutes = Math.floor(ms / 60000);
+      const seconds = Math.floor((ms % 60000) / 1000);
+      return `${minutes}m ${seconds}s`;
+    };
+
+    alert(`Session Info:
+- Session ID: ${sessionId}
+- Recording: ${isRecording ? 'Yes' : 'No'}
+- User: ${user?.name} (${user?.email})
+- Start Time: ${session ? new Date(session.startTime).toLocaleString() : 'N/A'}
+- Duration: ${formatDuration(duration)}
+- Time Remaining: ${formatDuration(remaining)}
+- Max Length: 30 minutes (demo setting)`);
+  };
+
   const handleError = () => {
     try {
       // Intentionally cause an error
@@ -85,6 +109,11 @@ function Home() {
             Your session is being recorded. Navigate between pages, click buttons, and interact
             with the UI. Stop recording when done and view the replay in the dashboard.
           </p>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+            <button className="btn" onClick={showSessionInfo}>
+              Show Session Info
+            </button>
+          </div>
           <div className="lumberjack-mask">
             <p style={{ padding: '10px', background: '#f0f0f0', borderRadius: '4px' }}>
               This content is masked and won't appear in replays.

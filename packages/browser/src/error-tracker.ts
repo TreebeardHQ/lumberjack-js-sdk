@@ -46,12 +46,12 @@ export class ErrorTracker {
     window.addEventListener(
       "error",
       (event) => {
-        const target = event.target as HTMLElement;
-        if (target !== window && target.tagName) {
+        const target = event.target;
+        if (target && target !== window && (target as HTMLElement).tagName) {
           if (Math.random() > this.sampleRate) return;
 
           this.trackError({
-            message: `Failed to load ${target.tagName} resource`,
+            message: `Failed to load ${(target as HTMLElement).tagName} resource`,
             filename: (target as any).src || (target as any).href,
             type: "resourceError",
           });

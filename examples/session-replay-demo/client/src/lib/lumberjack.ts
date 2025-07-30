@@ -38,15 +38,10 @@ const lumberjack = Lumberjack.init({
   
   // Advanced session replay configuration
   sessionReplayConfig: {
-    // Flush settings
-    flushInterval: 3000, // Flush every 3 seconds (faster for demo)
-    maxEventsPerChunk: 80, // Smaller chunks for demo
-    
     // Privacy settings
     maskAllInputs: true,
     blockClass: 'lumberjack-block',
     ignoreClass: 'lumberjack-ignore', 
-    maskClass: 'lumberjack-mask',
     
     // Performance sampling
     sampling: {
@@ -66,6 +61,9 @@ const lumberjack = Lumberjack.init({
   errorSampleRate: 1.0, // Capture all errors for demo
   replaySampleRate: 1.0, // Record all sessions for demo
   
+  // Session management
+  maxSessionLength: 30 * 60 * 1000, // 30 minutes for demo (shorter than default 1 hour)
+  
   // Buffering configuration
   bufferSize: 50, // Number of events before auto-flush
   flushInterval: 5000, // Flush every 5 seconds
@@ -74,25 +72,28 @@ const lumberjack = Lumberjack.init({
   endpoint: 'https://api.trylumberjack.com/rum/events',
 });
 
-// Set demo user
+// Start session with demo user context
 const userId = `user-${Math.random().toString(36).substr(2, 9)}`;
-lumberjack.setUser({
+lumberjack.start({
   id: userId,
   email: 'demo@example.com',
   name: 'Demo User',
 });
 
-// Create session on server
-fetch('/api/sessions', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    session_id: (lumberjack as any).sessionManager.getCurrentSession()?.id,
-    user_id: userId,
-    has_replay: true,
-  }),
-});
+// Create session on server using the new session API
+const session = lumberjack.getSession();
+if (session) {
+  fetch('/api/sessions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      session_id: session.id,
+      user_id: userId,
+      has_replay: session.hasReplay,
+    }),
+  });
+}
 
 export default lumberjack;

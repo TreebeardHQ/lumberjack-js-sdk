@@ -1,18 +1,23 @@
-import { record } from "rrweb";
-import type { eventWithTime } from "rrweb/typings/types";
-import type { FrontendEvent, SessionReplayConfig } from "./types";
+import { eventWithTime, record, recordOptions } from "rrweb";
+import type { FrontendEvent } from "./types";
+
+type Handler = ReturnType<typeof record>;
 
 export class SessionReplay {
-  private stopFn?: () => void;
+  private stopFn: Handler;
   private events: eventWithTime[] = [];
   private lastFlush = Date.now();
-  private config: Required<SessionReplayConfig>;
+  private config: recordOptions<eventWithTime> & {
+    flushInterval: number;
+    maxEventsPerChunk: number;
+  };
 
   constructor(
     private callback: (event: FrontendEvent) => void,
     private sessionId: () => string,
-    private privacyMode: "strict" | "standard",
-    config: SessionReplayConfig = {}
+    _privacyMode: "strict" | "standard", // Unused for now, not stored as private property
+    private onActivity: () => void, // New callback to update session activity
+    config: recordOptions<eventWithTime> = {}
   ) {
     // Set defaults for all config options
     const defaultSampling = {
@@ -28,12 +33,11 @@ export class SessionReplay {
       maskAllInputs: true,
       blockClass: "lumberjack-block",
       ignoreClass: "lumberjack-ignore",
-      maskClass: "lumberjack-mask",
+      maskTextSelector: "lumberjack-mask",
       recordCanvas: false,
       inlineImages: false,
       inlineStylesheet: true,
-      maskTextFn: undefined,
-      maskInputFn: undefined,
+
       ...config,
       // Merge sampling config properly
       sampling: {
@@ -44,32 +48,24 @@ export class SessionReplay {
   }
 
   start(blockSelectors: string[] = []): void {
-    const recordConfig = {
-      emit: (event) => {
+    const recordConfig: recordOptions<eventWithTime> = {
+      ...this.config,
+      emit: (event: eventWithTime) => {
         this.events.push(event);
+
+        // Update session activity on user interactions
+        this.onActivity();
 
         // Use configurable flush settings
         const timeSinceFlush = Date.now() - this.lastFlush;
-        if (timeSinceFlush > this.config.flushInterval || this.events.length > this.config.maxEventsPerChunk) {
+        if (
+          timeSinceFlush > this.config.flushInterval ||
+          this.events.length > this.config.maxEventsPerChunk
+        ) {
           this.flush();
         }
       },
-
-      // Privacy settings
-      maskAllInputs: this.config.maskAllInputs,
-      maskTextContent: this.privacyMode === "strict",
-      blockClass: this.config.blockClass,
-      ignoreClass: this.config.ignoreClass,
-      maskClass: this.config.maskClass,
       blockSelector: blockSelectors.join(","),
-
-      // Performance
-      sampling: this.config.sampling,
-
-      // Recording options
-      recordCanvas: this.config.recordCanvas,
-      inlineImages: this.config.inlineImages,
-      inlineStylesheet: this.config.inlineStylesheet,
     };
 
     // Add optional functions if provided

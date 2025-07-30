@@ -4,6 +4,7 @@ import type {
   UserContext,
   Exporter,
   CustomEventData,
+  Session,
 } from "./types";
 import { SessionManager } from "./session";
 import { EventBuffer } from "./buffer";
@@ -16,18 +17,20 @@ class LumberjackSDK {
     endpoint: string;
     bufferSize: number;
     flushInterval: number;
+    maxSessionLength: number;
     enableSessionReplay: boolean;
     replayPrivacyMode: "strict" | "standard";
     blockSelectors: string[];
     errorSampleRate: number;
     replaySampleRate: number;
   };
-  private sessionManager: SessionManager;
-  private buffer: EventBuffer;
-  private errorTracker: ErrorTracker;
+  private sessionManager?: SessionManager;
+  private buffer?: EventBuffer;
+  private errorTracker?: ErrorTracker;
   private sessionReplay?: SessionReplay;
   private exporter: Exporter;
   private userContext: UserContext | null = null;
+  private isStarted = false;
 
   constructor(config: FrontendConfig) {
     // Validate required configuration
@@ -37,6 +40,7 @@ class LumberjackSDK {
       endpoint: "https://api.trylumberjack.com/rum/events",
       bufferSize: 100,
       flushInterval: 10000,
+      maxSessionLength: 60 * 60 * 1000, // 1 hour
       enableSessionReplay: true,
       replayPrivacyMode: "standard",
       blockSelectors: [],
@@ -44,12 +48,6 @@ class LumberjackSDK {
       replaySampleRate: 0.1,
       ...config,
     };
-
-    // Initialize components
-    this.sessionManager = new SessionManager(
-      this.config.enableSessionReplay,
-      this.config.replaySampleRate
-    );
 
     // Use custom exporter if provided, otherwise default to HTTP
     this.exporter =
@@ -59,6 +57,29 @@ class LumberjackSDK {
         this.config.projectName,
         this.config.endpoint
       );
+  }
+
+  // Start the session with user context
+  public start(userContext: UserContext): void {
+    if (this.isStarted) {
+      console.warn("Lumberjack: Session already started");
+      return;
+    }
+
+    // Validate user context
+    if (!userContext.id || typeof userContext.id !== "string") {
+      throw new Error("Lumberjack: user.id is required and must be a string");
+    }
+
+    this.userContext = userContext;
+    this.isStarted = true;
+
+    // Initialize components
+    this.sessionManager = new SessionManager(
+      this.config.enableSessionReplay,
+      this.config.replaySampleRate,
+      this.config.maxSessionLength
+    );
 
     this.buffer = new EventBuffer(
       this.config.bufferSize,
@@ -72,7 +93,7 @@ class LumberjackSDK {
     // Initialize error tracking
     this.errorTracker = new ErrorTracker(
       this.trackEvent.bind(this),
-      () => this.sessionManager.getCurrentSession()?.id || "",
+      () => this.sessionManager?.getCurrentSession()?.id || "",
       this.config.errorSampleRate
     );
     this.errorTracker.start();
@@ -83,7 +104,8 @@ class LumberjackSDK {
         this.trackEvent.bind(this),
         () => session.id,
         this.config.replayPrivacyMode,
-        this.config.sessionReplayConfig
+        () => this.sessionManager?.updateActivity(), // Update session activity on rrweb events
+        this.config.sessionReplayConfig || {}
       );
       this.sessionReplay.start(this.config.blockSelectors);
     }
@@ -131,9 +153,20 @@ class LumberjackSDK {
     ) {
       throw new Error("Lumberjack: replaySampleRate must be between 0 and 1");
     }
+    if (
+      config.maxSessionLength !== undefined &&
+      (typeof config.maxSessionLength !== "number" || config.maxSessionLength <= 0)
+    ) {
+      throw new Error("Lumberjack: maxSessionLength must be a positive number (milliseconds)");
+    }
   }
 
   private trackEvent(event: FrontendEvent): void {
+    if (!this.isStarted || !this.buffer) {
+      console.warn("Lumberjack: Cannot track events before calling start()");
+      return;
+    }
+
     // Add user context to all events
     if (this.userContext) {
       event.userId = this.userContext.id;
@@ -143,6 +176,8 @@ class LumberjackSDK {
   }
 
   private async flushEvents(events: FrontendEvent[]): Promise<void> {
+    if (!this.sessionManager) return;
+    
     const session = this.sessionManager.getCurrentSession();
     if (!session) return;
 
@@ -153,23 +188,28 @@ class LumberjackSDK {
     // Flush on page hide
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
-        this.buffer.flush();
+        this.buffer?.flush();
       }
     });
 
     // Flush before unload
     window.addEventListener("beforeunload", () => {
-      this.buffer.flush();
+      this.buffer?.flush();
     });
 
     // Flush when back online
     window.addEventListener("online", () => {
-      this.buffer.flush();
+      this.buffer?.flush();
     });
   }
 
-  // Public API for user context (REQUIRED)
+  // Public API for user context (now handled by start())
   public setUser(user: UserContext): void {
+    if (!this.isStarted) {
+      console.warn("Lumberjack: Cannot set user before calling start(). Use start(userContext) instead.");
+      return;
+    }
+    
     if (!user.id || typeof user.id !== "string") {
       throw new Error("Lumberjack: user.id is required and must be a string");
     }
@@ -186,15 +226,13 @@ class LumberjackSDK {
 
   // Public API for custom events
   public track(eventName: string, properties?: Record<string, any>): void {
-    const session = this.sessionManager.getCurrentSession();
-    if (!session) return;
-
-    if (!this.userContext) {
-      console.warn(
-        "Lumberjack: User context not set. Call setUser() before tracking events."
-      );
+    if (!this.isStarted) {
+      console.warn("Lumberjack: Cannot track events before calling start()");
       return;
     }
+
+    const session = this.sessionManager?.getCurrentSession();
+    if (!session) return;
 
     this.trackEvent({
       type: "custom",
@@ -209,15 +247,13 @@ class LumberjackSDK {
 
   // Public API for manual error tracking
   public captureError(error: Error, context?: Record<string, any>): void {
-    const session = this.sessionManager.getCurrentSession();
-    if (!session) return;
-
-    if (!this.userContext) {
-      console.warn(
-        "Lumberjack: User context not set. Call setUser() before capturing errors."
-      );
+    if (!this.isStarted) {
+      console.warn("Lumberjack: Cannot capture errors before calling start()");
       return;
     }
+
+    const session = this.sessionManager?.getCurrentSession();
+    if (!session) return;
 
     this.trackEvent({
       type: "error",
@@ -232,9 +268,41 @@ class LumberjackSDK {
     });
   }
 
+  // Public API for session management
+  public getSession(): Session | null {
+    if (!this.isStarted || !this.sessionManager) {
+      return null;
+    }
+    return this.sessionManager.getCurrentSession();
+  }
+
+  public getSessionId(): string | null {
+    const session = this.getSession();
+    return session ? session.id : null;
+  }
+
+  public isRecording(): boolean {
+    const session = this.getSession();
+    return session ? session.hasReplay : false;
+  }
+
+  public getSessionDuration(): number {
+    const session = this.getSession();
+    if (!session) return 0;
+    return Date.now() - session.startTime;
+  }
+
+  public getSessionRemainingTime(): number {
+    const session = this.getSession();
+    if (!session) return 0;
+    const elapsed = this.getSessionDuration();
+    return Math.max(0, this.config.maxSessionLength - elapsed);
+  }
+
   public async shutdown(): Promise<void> {
     this.sessionReplay?.stop();
-    this.buffer.destroy();
+    this.buffer?.destroy();
+    this.isStarted = false;
   }
 }
 
@@ -260,11 +328,15 @@ export type {
   FrontendEvent,
   CustomEventData,
   Exporter,
-  SessionReplayConfig,
+  Session,
 } from "./types";
+
+// Re-export rrweb types for convenience
+export type { eventWithTime, recordOptions } from "rrweb";
 export { ConsoleExporter, HttpExporter } from "./exporter";
 
-// Auto-initialize if config exists
+// Auto-initialize if config exists (but don't auto-start)
 if (typeof window !== "undefined" && (window as any).__LUMBERJACK_CONFIG__) {
   init((window as any).__LUMBERJACK_CONFIG__);
+  // Note: User must still call start(userContext) manually
 }

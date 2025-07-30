@@ -4,7 +4,11 @@ export class SessionManager {
   private session: Session | null = null;
   private readonly SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
-  constructor(private enableReplay: boolean, private replaySampleRate: number) {
+  constructor(
+    private enableReplay: boolean, 
+    private replaySampleRate: number,
+    private maxSessionLength: number = 60 * 60 * 1000 // 1 hour default
+  ) {
     // Try to recover existing session on initialization
     this.recoverSession();
   }
@@ -13,16 +17,31 @@ export class SessionManager {
     const now = Date.now();
 
     // Check if existing session is still valid
-    if (
-      this.session &&
-      now - this.session.lastActivity < this.SESSION_TIMEOUT
-    ) {
+    if (this.session && this.isSessionValid(this.session, now)) {
       this.session.lastActivity = now;
       this.saveSession();
       return this.session;
     }
 
-    // Create new session
+    // Create new session (existing session expired or doesn't exist)
+    return this.createNewSession(now);
+  }
+
+  private isSessionValid(session: Session, now: number): boolean {
+    // Check activity timeout (30 minutes of inactivity)
+    if (now - session.lastActivity >= this.SESSION_TIMEOUT) {
+      return false;
+    }
+
+    // Check maximum session length (1 hour total)
+    if (now - session.startTime >= this.maxSessionLength) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private createNewSession(now: number): Session {
     const shouldReplay =
       this.enableReplay && Math.random() < this.replaySampleRate;
 
@@ -48,7 +67,7 @@ export class SessionManager {
       const now = Date.now();
 
       // Only recover if session is still valid
-      if (session && now - session.lastActivity < this.SESSION_TIMEOUT) {
+      if (session && this.isSessionValid(session, now)) {
         this.session = session;
       } else {
         // Clean up expired session
@@ -76,6 +95,13 @@ export class SessionManager {
 
   getCurrentSession(): Session | null {
     return this.session;
+  }
+
+  updateActivity(): void {
+    if (this.session) {
+      this.session.lastActivity = Date.now();
+      this.saveSession();
+    }
   }
 
   private generateSessionId(): string {
