@@ -2,6 +2,33 @@ export interface Exporter {
   export(events: FrontendEvent[], sessionId: string): Promise<void>;
 }
 
+export interface SessionReplayConfig {
+  // Flush settings
+  flushInterval?: number; // ms, default: 5000
+  maxEventsPerChunk?: number; // default: 100
+
+  // Privacy settings
+  maskAllInputs?: boolean; // default: true
+  blockClass?: string; // default: "lumberjack-block"
+  ignoreClass?: string; // default: "lumberjack-ignore"
+  maskClass?: string; // default: "lumberjack-mask"
+
+  // Performance sampling
+  sampling?: {
+    mousemove?: boolean | number; // default: false
+    mouseInteraction?: boolean; // default: true
+    scroll?: number; // default: 150
+    input?: "all" | "last"; // default: "last"
+  };
+
+  // Recording options
+  recordCanvas?: boolean; // default: false
+  inlineImages?: boolean; // default: false
+  inlineStylesheet?: boolean; // default: true
+  maskTextFn?: (text: string) => string;
+  maskInputFn?: (text: string) => string;
+}
+
 export interface FrontendConfig {
   apiKey: string;
   projectName: string;
@@ -18,6 +45,7 @@ export interface FrontendConfig {
   enableSessionReplay?: boolean;
   replayPrivacyMode?: "strict" | "standard";
   blockSelectors?: string[];
+  sessionReplayConfig?: SessionReplayConfig;
 
   // Sampling
   errorSampleRate?: number; // 0-1

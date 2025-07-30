@@ -1,23 +1,14 @@
-import { Routes, Route, Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
-import Home from './pages/Home';
-import Shop from './pages/Shop';
-import Profile from './pages/Profile';
-import Dashboard from './pages/Dashboard';
-import ReplayViewer from './pages/ReplayViewer';
-import lumberjack from './lib/lumberjack';
+import { useState } from "react";
+import { Link, Route, Routes } from "react-router-dom";
+import lumberjack from "./lib/lumberjack";
+import Dashboard from "./pages/Dashboard";
+import Home from "./pages/Home";
+import Profile from "./pages/Profile";
+import ReplayViewer from "./pages/ReplayViewer";
+import Shop from "./pages/Shop";
 
 function App() {
   const [isRecording, setIsRecording] = useState(true);
-  const [sessionId, setSessionId] = useState<string>('');
-
-  useEffect(() => {
-    // Get current session ID
-    const currentSession = (lumberjack as any).sessionManager.getCurrentSession();
-    if (currentSession) {
-      setSessionId(currentSession.id);
-    }
-  }, []);
 
   const stopRecording = async () => {
     await lumberjack.shutdown();
@@ -28,10 +19,18 @@ function App() {
     <div className="app">
       <nav className="nav">
         <ul>
-          <li><Link to="/">Home</Link></li>
-          <li><Link to="/shop">Shop</Link></li>
-          <li><Link to="/profile">Profile</Link></li>
-          <li style={{ marginLeft: 'auto' }}><Link to="/dashboard">Dashboard</Link></li>
+          <li>
+            <Link to="/">Home</Link>
+          </li>
+          <li>
+            <Link to="/shop">Shop</Link>
+          </li>
+          <li>
+            <Link to="/profile">Profile</Link>
+          </li>
+          <li style={{ marginLeft: "auto" }}>
+            <Link to="/dashboard">Dashboard</Link>
+          </li>
         </ul>
       </nav>
 

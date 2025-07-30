@@ -18,10 +18,7 @@ export class HttpExporter implements Exporter {
       events: events.map((event) => ({
         type: event.type,
         timestamp: event.timestamp,
-        data:
-          event.type === "session_replay"
-            ? this.compressReplayData(event.data)
-            : event.data,
+        data: event.data,
       })),
     };
 
@@ -39,18 +36,6 @@ export class HttpExporter implements Exporter {
     }
   }
 
-  private compressReplayData(data: any): any {
-    // For now, just stringify large replay events
-    // In production, use CompressionStream API if available
-    if (data.events && data.events.length > 50) {
-      return {
-        ...data,
-        events: JSON.stringify(data.events),
-        compressed: true,
-      };
-    }
-    return data;
-  }
 }
 
 // Simple console exporter for development/debugging

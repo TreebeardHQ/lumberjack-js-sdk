@@ -82,7 +82,8 @@ class LumberjackSDK {
       this.sessionReplay = new SessionReplay(
         this.trackEvent.bind(this),
         () => session.id,
-        this.config.replayPrivacyMode
+        this.config.replayPrivacyMode,
+        this.config.sessionReplayConfig
       );
       this.sessionReplay.start(this.config.blockSelectors);
     }
@@ -259,6 +260,7 @@ export type {
   FrontendEvent,
   CustomEventData,
   Exporter,
+  SessionReplayConfig,
 } from "./types";
 export { ConsoleExporter, HttpExporter } from "./exporter";
 
