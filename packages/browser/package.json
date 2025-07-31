@@ -1,6 +1,6 @@
 {
   "name": "@lumberjack-sdk/browser",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Browser error tracking, custom events, and session replay for Lumberjack",
   "type": "module",
   "main": "dist/index.js",
