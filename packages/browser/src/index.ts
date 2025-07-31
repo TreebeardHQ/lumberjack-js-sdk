@@ -321,6 +321,20 @@ export function getInstance(): LumberjackSDK | null {
   return instance;
 }
 
+// Convenience method that gets the instance and starts it
+export function start(userContext: UserContext): (() => Promise<void>) | null {
+  const sdk = getInstance();
+  if (!sdk) {
+    console.warn("Lumberjack: SDK not initialized. Call init() first.");
+    return null;
+  }
+  
+  sdk.start(userContext);
+  
+  // Return shutdown callback
+  return () => sdk.shutdown();
+}
+
 // Re-export types and utilities
 export type {
   FrontendConfig,
