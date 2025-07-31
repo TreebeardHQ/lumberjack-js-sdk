@@ -155,9 +155,12 @@ class LumberjackSDK {
     }
     if (
       config.maxSessionLength !== undefined &&
-      (typeof config.maxSessionLength !== "number" || config.maxSessionLength <= 0)
+      (typeof config.maxSessionLength !== "number" ||
+        config.maxSessionLength <= 0)
     ) {
-      throw new Error("Lumberjack: maxSessionLength must be a positive number (milliseconds)");
+      throw new Error(
+        "Lumberjack: maxSessionLength must be a positive number (milliseconds)"
+      );
     }
   }
 
@@ -177,7 +180,7 @@ class LumberjackSDK {
 
   private async flushEvents(events: FrontendEvent[]): Promise<void> {
     if (!this.sessionManager) return;
-    
+
     const session = this.sessionManager.getCurrentSession();
     if (!session) return;
 
@@ -206,10 +209,12 @@ class LumberjackSDK {
   // Public API for user context (now handled by start())
   public setUser(user: UserContext): void {
     if (!this.isStarted) {
-      console.warn("Lumberjack: Cannot set user before calling start(). Use start(userContext) instead.");
+      console.warn(
+        "Lumberjack: Cannot set user before calling start(). Use start(userContext) instead."
+      );
       return;
     }
-    
+
     if (!user.id || typeof user.id !== "string") {
       throw new Error("Lumberjack: user.id is required and must be a string");
     }
@@ -261,7 +266,7 @@ class LumberjackSDK {
       sessionId: session.id,
       data: {
         message: error.message,
-        stack: error.stack || '',
+        stack: error.stack || "",
         type: "error" as const,
         ...context,
       },
@@ -328,9 +333,9 @@ export function start(userContext: UserContext): (() => Promise<void>) | null {
     console.warn("Lumberjack: SDK not initialized. Call init() first.");
     return null;
   }
-  
+
   sdk.start(userContext);
-  
+
   // Return shutdown callback
   return () => sdk.shutdown();
 }
