@@ -125,6 +125,10 @@ class LumberjackSDK {
         },
       },
     });
+
+    if (this.config.debug) {
+      console.log("[Lumberjack] Starting SDK...");
+    }
   }
 
   private validateConfig(config: FrontendConfig): void {
@@ -182,9 +186,22 @@ class LumberjackSDK {
     if (!this.sessionManager) return;
 
     const session = this.sessionManager.getCurrentSession();
-    if (!session) return;
+    if (!session || !this.userContext) {
+      if (this.config.debug) {
+        console.warn(
+          "Attempted to flush logs with either no session or user context",
+          session,
+          this.userContext
+        );
+      }
+      return;
+    }
 
-    await this.exporter.export(events, session.id);
+    if (this.config.debug) {
+      console.log("Flushing events", events.length);
+    }
+
+    await this.exporter.export(events, session.id, this.userContext);
   }
 
   private setupLifecycleHandlers(): void {

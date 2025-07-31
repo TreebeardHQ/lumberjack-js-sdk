@@ -1,4 +1,4 @@
-import type { FrontendEvent, Exporter } from "./types";
+import type { FrontendEvent, Exporter, UserContext } from "./types";
 
 export class HttpExporter implements Exporter {
   private endpoint: string;
@@ -11,10 +11,15 @@ export class HttpExporter implements Exporter {
     this.endpoint = endpoint || "https://api.trylumberjack.com/rum/events";
   }
 
-  async export(events: FrontendEvent[], sessionId: string): Promise<void> {
+  async export(
+    events: FrontendEvent[],
+    sessionId: string,
+    userContext: UserContext
+  ): Promise<void> {
     const payload = {
       project_name: this.projectName,
       session_id: sessionId,
+      user_context: userContext,
       events: events.map((event) => ({
         type: event.type,
         timestamp: event.timestamp,
@@ -35,7 +40,6 @@ export class HttpExporter implements Exporter {
       throw new Error(`Export failed: ${response.status}`);
     }
   }
-
 }
 
 // Simple console exporter for development/debugging

@@ -1,7 +1,11 @@
 import type { eventWithTime, recordOptions } from "rrweb";
 
 export interface Exporter {
-  export(events: FrontendEvent[], sessionId: string): Promise<void>;
+  export(
+    events: FrontendEvent[],
+    sessionId: string,
+    user_context: UserContext
+  ): Promise<void>;
 }
 
 export interface FrontendConfig {
@@ -28,6 +32,7 @@ export interface FrontendConfig {
   // Sampling
   errorSampleRate?: number; // 0-1
   replaySampleRate?: number; // 0-1
+  debug?: boolean;
 }
 
 export interface UserContext {
