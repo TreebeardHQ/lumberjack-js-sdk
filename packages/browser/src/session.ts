@@ -104,6 +104,17 @@ export class SessionManager {
     }
   }
 
+  destroySession(): void {
+    this.session = null;
+    try {
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.removeItem("lumberjack_session");
+      }
+    } catch (error) {
+      console.warn("Failed to clear session storage:", error);
+    }
+  }
+
   private generateSessionId(): string {
     // Simple UUID v4 generation for browsers
     const array = new Uint8Array(16);

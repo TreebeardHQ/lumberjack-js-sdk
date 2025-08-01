@@ -1,4 +1,5 @@
 import type { FrontendEvent, Exporter, UserContext } from "./types";
+import { collectBrowserProperties } from "./browser-properties";
 
 export class HttpExporter implements Exporter {
   private endpoint: string;
@@ -16,10 +17,13 @@ export class HttpExporter implements Exporter {
     sessionId: string,
     userContext: UserContext
   ): Promise<void> {
+    const properties = collectBrowserProperties();
+    
     const payload = {
       project_name: this.projectName,
       session_id: sessionId,
       user_context: userContext,
+      properties: properties,
       events: events.map((event) => ({
         type: event.type,
         timestamp: event.timestamp,

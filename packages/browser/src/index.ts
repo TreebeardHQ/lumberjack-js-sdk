@@ -28,7 +28,7 @@ class LumberjackSDK {
   private sessionManager?: SessionManager;
   private buffer?: EventBuffer;
   private errorTracker?: ErrorTracker;
-  private sessionReplay?: SessionReplay;
+  private sessionReplay?: SessionReplay | undefined;
   private networkInterceptor?: NetworkInterceptor;
   private exporter: Exporter;
   private userContext: UserContext | null = null;
@@ -59,9 +59,6 @@ class LumberjackSDK {
         this.config.projectName,
         this.config.endpoint
       );
-
-    // @ts-ignore
-    window.__lumberjack__ = this;
   }
 
   // Start the session with user context
@@ -139,6 +136,8 @@ class LumberjackSDK {
 
     if (this.config.debug) {
       console.log("[Lumberjack] Starting SDK...");
+      // @ts-ignore
+      window.__lumberjack__ = this;
     }
   }
 
@@ -334,6 +333,32 @@ class LumberjackSDK {
     if (!session) return 0;
     const elapsed = this.getSessionDuration();
     return Math.max(0, this.config.maxSessionLength - elapsed);
+  }
+
+  public restart(): void {
+    if (!this.isStarted) {
+      console.warn("Lumberjack: Cannot restart before calling start()");
+      return;
+    }
+
+    if (!this.userContext) {
+      console.warn("Lumberjack: Cannot restart without user context");
+      return;
+    }
+
+    const currentUserContext = this.userContext;
+
+    // Shutdown current session
+    this.sessionReplay?.stop();
+    this.sessionManager?.destroySession();
+    this.buffer?.flush();
+
+    // Reset state
+    this.isStarted = false;
+    this.sessionReplay = undefined;
+
+    // Start with same user context
+    this.start(currentUserContext);
   }
 
   public async shutdown(): Promise<void> {
