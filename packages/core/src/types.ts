@@ -64,6 +64,7 @@ export interface LumberjackConfig {
   serviceToken?: string;
   gatekeeperEndpoint?: string;
   exporter?: Exporter;
+  getHeaders?: () => Promise<Record<string, string>>;
 }
 
 export interface TraceContext {

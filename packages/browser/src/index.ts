@@ -11,6 +11,7 @@ import { EventBuffer } from "./buffer";
 import { ErrorTracker } from "./error-tracker";
 import { SessionReplay } from "./session-replay";
 import { HttpExporter } from "./exporter";
+import { NetworkInterceptor } from "./network-interceptor";
 
 class LumberjackSDK {
   private config: FrontendConfig & {
@@ -28,6 +29,7 @@ class LumberjackSDK {
   private buffer?: EventBuffer;
   private errorTracker?: ErrorTracker;
   private sessionReplay?: SessionReplay;
+  private networkInterceptor?: NetworkInterceptor;
   private exporter: Exporter;
   private userContext: UserContext | null = null;
   private isStarted = false;
@@ -57,6 +59,9 @@ class LumberjackSDK {
         this.config.projectName,
         this.config.endpoint
       );
+
+    // @ts-ignore
+    window.__lumberjack__ = this;
   }
 
   // Start the session with user context
@@ -97,6 +102,12 @@ class LumberjackSDK {
       this.config.errorSampleRate
     );
     this.errorTracker.start();
+
+    // Initialize network interceptor
+    this.networkInterceptor = new NetworkInterceptor(
+      () => this.sessionManager?.getCurrentSession()?.id || null
+    );
+    this.networkInterceptor.start();
 
     // Initialize session replay if enabled for this session
     if (session.hasReplay) {
@@ -189,7 +200,7 @@ class LumberjackSDK {
     if (!session || !this.userContext) {
       if (this.config.debug) {
         console.warn(
-          "Attempted to flush logs with either no session or user context",
+          "[Lumberjack] Attempted to flush logs with either no session or user context",
           session,
           this.userContext
         );
@@ -198,7 +209,11 @@ class LumberjackSDK {
     }
 
     if (this.config.debug) {
-      console.log("Flushing events", events.length);
+      console.log(
+        "[Lumberjack] Flushing events",
+        events.length,
+        this.userContext
+      );
     }
 
     await this.exporter.export(events, session.id, this.userContext);
@@ -323,6 +338,7 @@ class LumberjackSDK {
 
   public async shutdown(): Promise<void> {
     this.sessionReplay?.stop();
+    this.networkInterceptor?.stop();
     this.buffer?.destroy();
     this.isStarted = false;
   }

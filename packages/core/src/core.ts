@@ -30,8 +30,11 @@ declare global {
 export class LumberjackCore extends EventEmitter {
   private static instance: LumberjackCore | null = null;
 
-  private config!: Required<Omit<LumberjackConfig, "exporter">> & {
+  private config!: Required<
+    Omit<LumberjackConfig, "exporter" | "getHeaders">
+  > & {
     exporter?: Exporter | undefined;
+    getHeaders?: () => Promise<Record<string, string>>;
   };
   private logBuffer: LogEntry[] = [];
   private objectBatch: ObjectBatch | null = null;
@@ -342,6 +345,39 @@ export class LumberjackCore extends EventEmitter {
     this.log("fatal", message, metadata, caller);
   }
 
+  registerUser(
+    user: {
+      id: string;
+      [key: string]: any;
+    },
+    group?: {
+      label: string;
+      id: string;
+      [key: string]: any;
+    }
+  ): void {
+    this.registerObject({ user: user, [group?.label || "group"]: group });
+
+    // if we set the user, attempt to register the session
+    this.attemptRegisterSession();
+  }
+
+  attemptRegisterSession() {
+    if (this.config.getHeaders) {
+      const currentSpan = trace.getActiveSpan();
+      this.config.getHeaders().then((headers) => {
+        if (headers && headers["x-lumberjack-session-id"]) {
+          if (currentSpan) {
+            currentSpan.setAttribute(
+              "x-lumberjack-session-id",
+              headers["x-lumberjack-session-id"]
+            );
+          }
+        }
+      });
+    }
+  }
+
   registerObject(obj?: any): void {
     if (this.isShuttingDown) return;
 
@@ -363,6 +399,9 @@ export class LumberjackCore extends EventEmitter {
           console.log("[Lumberjack] Formatted object:", formattedObj);
         }
         if (formattedObj) {
+          if (key === "user") {
+            this.attemptRegisterSession();
+          }
           // Always attach to context regardless of cache status
           this.attachToContext(formattedObj);
 
@@ -378,6 +417,9 @@ export class LumberjackCore extends EventEmitter {
       // Handle single object registration
       const formattedObj = this.formatObject(obj);
       if (formattedObj) {
+        if (formattedObj.name === "user") {
+          this.attemptRegisterSession();
+        }
         // Always attach to context regardless of cache status
         this.attachToContext(formattedObj);
 
@@ -800,8 +842,9 @@ export class LumberjackCore extends EventEmitter {
     }
   }
 
-  getConfig(): Required<Omit<LumberjackConfig, "exporter">> & {
+  getConfig(): Required<Omit<LumberjackConfig, "exporter" | "getHeaders">> & {
     exporter?: Exporter | undefined;
+    getHeaders?: () => Promise<Record<string, string>>;
   } {
     return this.config;
   }
