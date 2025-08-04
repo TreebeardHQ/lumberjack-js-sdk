@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import rrwebPlayer from 'rrweb-player';
-import 'rrweb-player/dist/style.css';
+import { useEffect, useRef, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import rrwebPlayer from "rrweb-player";
+import "rrweb-player/dist/style.css";
 
 interface SessionDetails {
   session: {
@@ -28,7 +28,9 @@ interface ReplayData {
 
 function ReplayViewer() {
   const { sessionId } = useParams<{ sessionId: string }>();
-  const [sessionDetails, setSessionDetails] = useState<SessionDetails | null>(null);
+  const [sessionDetails, setSessionDetails] = useState<SessionDetails | null>(
+    null
+  );
   const [replayData, setReplayData] = useState<ReplayData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +49,15 @@ function ReplayViewer() {
 
   useEffect(() => {
     if (replayData && playerContainerRef.current && !playerRef.current) {
+      let events = [];
+      replayData.events.forEach((event) => {
+        if (event.name === "user") {
+          events.push({
+            ...event,
+            name: "user",
+          });
+        }
+      });
       // Initialize rrweb player
       playerRef.current = new rrwebPlayer({
         target: playerContainerRef.current,
@@ -57,8 +68,8 @@ function ReplayViewer() {
           autoPlay: false,
           showController: false, // Hide built-in controls since we have custom ones
           tags: {
-            'custom-event': 'rgb(73, 80, 246)',
-            'error': 'rgb(255, 0, 0)',
+            "custom-event": "rgb(73, 80, 246)",
+            error: "rgb(255, 0, 0)",
           },
         },
       });
@@ -91,7 +102,7 @@ function ReplayViewer() {
       ]);
 
       if (!detailsRes.ok || !replayRes.ok) {
-        throw new Error('Failed to fetch session data');
+        throw new Error("Failed to fetch session data");
       }
 
       const details = await detailsRes.json();
@@ -100,7 +111,7 @@ function ReplayViewer() {
       setSessionDetails(details);
       setReplayData(replay);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setLoading(false);
     }
@@ -159,7 +170,7 @@ function ReplayViewer() {
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
   if (loading) {
@@ -177,7 +188,7 @@ function ReplayViewer() {
       <div className="container">
         <div className="error-display">
           <h2>Error Loading Replay</h2>
-          <p>{error || 'Session not found'}</p>
+          <p>{error || "Session not found"}</p>
           <Link to="/dashboard">
             <button className="btn">Back to Dashboard</button>
           </Link>
@@ -197,10 +208,19 @@ function ReplayViewer() {
 
       <div className="card">
         <h2>Session Information</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginTop: '15px' }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: "20px",
+            marginTop: "15px",
+          }}
+        >
           <div>
             <strong>Session ID:</strong>
-            <p style={{ fontFamily: 'monospace', fontSize: '14px' }}>{sessionDetails.session.id}</p>
+            <p style={{ fontFamily: "monospace", fontSize: "14px" }}>
+              {sessionDetails.session.id}
+            </p>
           </div>
           <div>
             <strong>User ID:</strong>
@@ -219,71 +239,79 @@ function ReplayViewer() {
 
       <div className="card">
         <h2>Replay Player</h2>
-        <div style={{ marginTop: '20px' }}>
-          <div style={{ 
-            display: 'flex', 
-            gap: '10px', 
-            alignItems: 'center',
-            marginBottom: '15px',
-            padding: '10px',
-            background: '#f8f9fa',
-            borderRadius: '4px'
-          }}>
-            <button 
+        <div style={{ marginTop: "20px" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              alignItems: "center",
+              marginBottom: "15px",
+              padding: "10px",
+              background: "#f8f9fa",
+              borderRadius: "4px",
+            }}
+          >
+            <button
               className="btn"
               onClick={handlePlayPause}
-              style={{ minWidth: '100px' }}
+              style={{ minWidth: "100px" }}
             >
-              {isPlaying ? '⏸ Pause' : '▶️ Play'}
+              {isPlaying ? "⏸ Pause" : "▶️ Play"}
             </button>
-            <button 
-              className="btn btn-secondary"
-              onClick={handleRestart}
-            >
+            <button className="btn btn-secondary" onClick={handleRestart}>
               ⏮ Restart
             </button>
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: '5px', alignItems: 'center' }}>
+            <div
+              style={{
+                marginLeft: "auto",
+                display: "flex",
+                gap: "5px",
+                alignItems: "center",
+              }}
+            >
               <span>Speed:</span>
-              <button 
+              <button
                 className="btn btn-secondary"
                 onClick={() => handleSpeedChange(0.5)}
-                style={{ padding: '5px 10px' }}
+                style={{ padding: "5px 10px" }}
               >
                 0.5x
               </button>
-              <button 
+              <button
                 className="btn btn-secondary"
                 onClick={() => handleSpeedChange(1)}
-                style={{ padding: '5px 10px' }}
+                style={{ padding: "5px 10px" }}
               >
                 1x
               </button>
-              <button 
+              <button
                 className="btn btn-secondary"
                 onClick={() => handleSpeedChange(2)}
-                style={{ padding: '5px 10px' }}
+                style={{ padding: "5px 10px" }}
               >
                 2x
               </button>
-              <button 
+              <button
                 className="btn btn-secondary"
                 onClick={() => handleSpeedChange(4)}
-                style={{ padding: '5px 10px' }}
+                style={{ padding: "5px 10px" }}
               >
                 4x
               </button>
             </div>
           </div>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            marginBottom: '15px',
-            padding: '10px',
-            background: '#f8f9fa',
-            borderRadius: '4px'
-          }}>
-            <span style={{ minWidth: '50px', fontSize: '14px' }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              marginBottom: "15px",
+              padding: "10px",
+              background: "#f8f9fa",
+              borderRadius: "4px",
+            }}
+          >
+            <span style={{ minWidth: "50px", fontSize: "14px" }}>
               {formatTimeDisplay(currentTime)}
             </span>
             <input
@@ -294,23 +322,24 @@ function ReplayViewer() {
               onChange={handleSeek}
               style={{
                 flex: 1,
-                height: '6px',
-                cursor: 'pointer',
-                appearance: 'none',
-                background: `linear-gradient(to right, #0066cc 0%, #0066cc ${(currentTime / duration) * 100}%, #ddd ${(currentTime / duration) * 100}%, #ddd 100%)`,
-                borderRadius: '3px',
-                outline: 'none',
+                height: "6px",
+                cursor: "pointer",
+                appearance: "none",
+                background: `linear-gradient(to right, #0066cc 0%, #0066cc ${
+                  (currentTime / duration) * 100
+                }%, #ddd ${(currentTime / duration) * 100}%, #ddd 100%)`,
+                borderRadius: "3px",
+                outline: "none",
               }}
               className="replay-scrubber"
             />
-            <span style={{ minWidth: '50px', fontSize: '14px', textAlign: 'right' }}>
+            <span
+              style={{ minWidth: "50px", fontSize: "14px", textAlign: "right" }}
+            >
               {formatTimeDisplay(duration)}
             </span>
           </div>
-          <div 
-            ref={playerContainerRef} 
-            className="replay-player"
-          />
+          <div ref={playerContainerRef} className="replay-player" />
         </div>
       </div>
 
@@ -326,25 +355,33 @@ function ReplayViewer() {
             </tr>
           </thead>
           <tbody>
-            {sessionDetails.events.map(event => (
+            {sessionDetails.events.map((event) => (
               <tr key={event.id}>
                 <td>{formatTime(event.timestamp)}</td>
                 <td>
-                  <span className={`badge badge-${event.type === 'error' ? 'error' : 'custom'}`}>
+                  <span
+                    className={`badge badge-${
+                      event.type === "error" ? "error" : "custom"
+                    }`}
+                  >
                     {event.type}
                   </span>
                 </td>
                 <td>{event.name || event.data.message}</td>
                 <td>
                   <details>
-                    <summary style={{ cursor: 'pointer' }}>View Details</summary>
-                    <pre style={{ 
-                      fontSize: '12px', 
-                      background: '#f5f5f5', 
-                      padding: '10px',
-                      borderRadius: '4px',
-                      marginTop: '10px' 
-                    }}>
+                    <summary style={{ cursor: "pointer" }}>
+                      View Details
+                    </summary>
+                    <pre
+                      style={{
+                        fontSize: "12px",
+                        background: "#f5f5f5",
+                        padding: "10px",
+                        borderRadius: "4px",
+                        marginTop: "10px",
+                      }}
+                    >
                       {JSON.stringify(event.data, null, 2)}
                     </pre>
                   </details>

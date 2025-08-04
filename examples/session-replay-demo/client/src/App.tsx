@@ -6,6 +6,7 @@ import Home from "./pages/Home";
 import Profile from "./pages/Profile";
 import ReplayViewer from "./pages/ReplayViewer";
 import Shop from "./pages/Shop";
+import PageViewTest from "./pages/PageViewTest";
 
 function App() {
   const [isRecording, setIsRecording] = useState(true);
@@ -28,6 +29,9 @@ function App() {
           <li>
             <Link to="/profile">Profile</Link>
           </li>
+          <li>
+            <Link to="/page-view-test">Page View Test</Link>
+          </li>
           <li style={{ marginLeft: "auto" }}>
             <Link to="/dashboard">Dashboard</Link>
           </li>
@@ -48,6 +52,8 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/shop" element={<Shop />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/page-view-test" element={<PageViewTest />} />
+        <Route path="/page-view-test/*" element={<PageViewTest />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/replay/:sessionId" element={<ReplayViewer />} />
       </Routes>

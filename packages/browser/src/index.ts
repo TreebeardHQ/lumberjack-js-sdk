@@ -12,6 +12,7 @@ import { ErrorTracker } from "./error-tracker";
 import { SessionReplay } from "./session-replay";
 import { HttpExporter } from "./exporter";
 import { NetworkInterceptor } from "./network-interceptor";
+import { PageViewTracker } from "./page-view-tracker";
 
 class LumberjackSDK {
   private config: FrontendConfig & {
@@ -30,6 +31,7 @@ class LumberjackSDK {
   private errorTracker?: ErrorTracker;
   private sessionReplay?: SessionReplay | undefined;
   private networkInterceptor?: NetworkInterceptor;
+  private pageViewTracker?: PageViewTracker;
   private exporter: Exporter;
   private userContext: UserContext | null = null;
   private isStarted = false;
@@ -90,7 +92,7 @@ class LumberjackSDK {
     );
 
     // Start session
-    const session = this.sessionManager.getOrCreateSession();
+    const { session, isNew } = this.sessionManager.getOrCreateSession();
 
     // Initialize error tracking
     this.errorTracker = new ErrorTracker(
@@ -105,6 +107,13 @@ class LumberjackSDK {
       () => this.sessionManager?.getCurrentSession()?.id || null
     );
     this.networkInterceptor.start();
+
+    // Initialize page view tracker
+    this.pageViewTracker = new PageViewTracker(
+      this.trackEvent.bind(this),
+      () => this.sessionManager?.getCurrentSession()?.id || ""
+    );
+    this.pageViewTracker.start();
 
     // Initialize session replay if enabled for this session
     if (session.hasReplay) {
@@ -121,13 +130,13 @@ class LumberjackSDK {
     // Setup lifecycle handlers
     this.setupLifecycleHandlers();
 
-    // Send session start event
+    // Send appropriate session event
     this.trackEvent({
       type: "custom",
       timestamp: Date.now(),
       sessionId: session.id,
       data: {
-        name: "session_started",
+        name: isNew ? "session_started" : "session_resumed",
         properties: {
           hasReplay: session.hasReplay,
         },
@@ -364,6 +373,7 @@ class LumberjackSDK {
   public async shutdown(): Promise<void> {
     this.sessionReplay?.stop();
     this.networkInterceptor?.stop();
+    this.pageViewTracker?.stop();
     this.buffer?.destroy();
     this.isStarted = false;
   }

@@ -13,18 +13,19 @@ export class SessionManager {
     this.recoverSession();
   }
 
-  getOrCreateSession(): Session {
+  getOrCreateSession(): { session: Session; isNew: boolean } {
     const now = Date.now();
 
     // Check if existing session is still valid
     if (this.session && this.isSessionValid(this.session, now)) {
       this.session.lastActivity = now;
       this.saveSession();
-      return this.session;
+      return { session: this.session, isNew: false };
     }
 
     // Create new session (existing session expired or doesn't exist)
-    return this.createNewSession(now);
+    const session = this.createNewSession(now);
+    return { session, isNew: true };
   }
 
   private isSessionValid(session: Session, now: number): boolean {

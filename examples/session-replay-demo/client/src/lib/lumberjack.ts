@@ -1,9 +1,22 @@
 import * as Lumberjack from "@lumberjack-sdk/browser";
 import type { FrontendEvent, Exporter } from "@lumberjack-sdk/browser";
 
-// Custom exporter that sends to our demo server
+// Custom exporter that sends to our demo server and logs page views
 class DemoExporter implements Exporter {
   async export(events: FrontendEvent[], sessionId: string): Promise<void> {
+    // Log page view events specifically
+    events.forEach(event => {
+      if (event.type === 'custom' && event.data?.name === 'page_view') {
+        console.log('%c[Page View Event]', 'color: #4CAF50; font-weight: bold', {
+          navigation_type: event.data.properties?.navigation_type,
+          url: event.data.properties?.url,
+          path: event.data.properties?.path,
+          title: event.data.properties?.title,
+          timestamp: new Date(event.timestamp).toLocaleTimeString()
+        });
+      }
+    });
+
     const response = await fetch("/api/events", {
       method: "POST",
       headers: {
